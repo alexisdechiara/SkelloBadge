@@ -1,0 +1,9 @@
+# Normalise tout en LF dans le dépôt. Sans cela, gradlew part en CRLF depuis Windows
+# et devient inexécutable sur les runners Linux de la CI.
+* text=auto eol=lf
+
+gradlew      text eol=lf
+*.bat        text eol=crlf
+*.jar        binary
+*.png        binary
+*.keystore   binary
