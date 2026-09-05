@@ -4,6 +4,16 @@ Rappels de badgeage Android, calés sur un planning Skello. On la configure une 
 puis on l'oublie : elle lit le planning toute seule, pose ses alarmes, et la
 notification ouvre directement **Skello : la badgeuse** (`com.skellopunchclock`).
 
+## Installer
+
+**[Télécharger la dernière version](https://github.com/alexisdechiara/SkelloBadge/releases/latest)**
+
+Récupérer le fichier `.apk`, l'ouvrir sur le téléphone, et autoriser l'installation depuis
+cette source quand Android le demande. Ce lien pointe toujours vers la version la plus
+récente ; les mises à jour s'installent par-dessus, sans perdre la configuration.
+
+Android 8.0 ou plus récent.
+
 ## Ce qu'elle fait
 
 À chaque échéance du planning, une notification tombe :
@@ -127,16 +137,23 @@ téléphone avant d'en dépendre :
 
 ## Compiler
 
-La chaîne d'outils est installée hors du dépôt, dans `D:\Users\Alexis\Programmation\_android` :
+Il faut un JDK 21 et le SDK Android, compilation contre l'API 37. Le chemin du SDK se
+déclare dans `local.properties`, non versionné :
 
-```bash
-JAVA_HOME=D:/Users/Alexis/Programmation/_android/jdk ./gradlew assembleDebug
+```
+sdk.dir=/chemin/vers/android/sdk
 ```
 
-Le SDK est référencé par `local.properties`, non versionné. Pour l'APK distribuable :
+Puis :
 
 ```bash
-JAVA_HOME=D:/Users/Alexis/Programmation/_android/jdk ./gradlew assembleRelease
+./gradlew assembleDebug
+```
+
+Pour l'APK distribuable :
+
+```bash
+./gradlew assembleRelease
 ```
 
 La signature de distribution est décrite par `keystore.properties`, lui aussi hors dépôt.
@@ -177,7 +194,7 @@ gh repo edit --visibility public --accept-visibility-change-consequences
 Tests du moteur de planification :
 
 ```bash
-JAVA_HOME=D:/Users/Alexis/Programmation/_android/jdk ./gradlew testDebugUnitTest
+./gradlew testDebugUnitTest
 ```
 
 ## Limites connues
