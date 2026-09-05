@@ -10,18 +10,36 @@ plugins {
 /**
  * Clé de signature de distribution.
  *
- * Le fichier keystore.properties et le magasin de clés lui-même restent hors du dépôt.
- * En leur absence — sur un poste qui vient de cloner, ou dans la CI — la variante release
- * retombe sur la clé de debug : le build ne casse pas, mais l'APK produit ne peut pas
- * mettre à jour une installation signée avec la vraie clé.
+ * Deux provenances : le fichier keystore.properties sur un poste de développement, et
+ * l'environnement dans la CI, qui n'a pas de fichier mais reçoit la clé par les secrets
+ * du dépôt. L'environnement l'emporte quand les deux sont présents.
+ *
+ * En l'absence des deux — sur un poste qui vient de cloner — la variante release retombe
+ * sur la clé de debug : le build ne casse pas, mais l'APK produit ne peut pas mettre à
+ * jour une installation signée avec la vraie clé.
  */
-val keystorePropertiesFile = rootProject.file("keystore.properties")
 val keystoreProperties = Properties().apply {
-    if (keystorePropertiesFile.exists()) {
-        keystorePropertiesFile.inputStream().use(::load)
-    }
+    rootProject.file("keystore.properties")
+        .takeIf { it.exists() }
+        ?.inputStream()
+        ?.use(::load)
+
+    System.getenv("SIGNING_STORE_FILE")?.let { setProperty("storeFile", it) }
+    System.getenv("SIGNING_STORE_PASSWORD")?.let { setProperty("storePassword", it) }
+    System.getenv("SIGNING_KEY_ALIAS")?.let { setProperty("keyAlias", it) }
+    System.getenv("SIGNING_KEY_PASSWORD")?.let { setProperty("keyPassword", it) }
 }
 val hasReleaseKey = keystoreProperties.getProperty("storeFile") != null
+
+/**
+ * Version de l'application.
+ *
+ * La CI de publication dérive ces valeurs de l'étiquette Git, de sorte que l'APK annonce
+ * la version sous laquelle il est distribué. Le code de version doit croître à chaque
+ * publication, sans quoi Android refuse la mise à jour.
+ */
+val appVersionName: String = System.getenv("APP_VERSION_NAME") ?: "1.0"
+val appVersionCode: Int = System.getenv("APP_VERSION_CODE")?.toIntOrNull() ?: 1
 
 android {
     namespace = "fr.gaddiction.skellobadge"
@@ -36,8 +54,8 @@ android {
         // Volontairement en retrait du compileSdk : cibler l'API 37 activerait des
         // changements de comportement système non vérifiés sur cette application.
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
     }
 
     signingConfigs {

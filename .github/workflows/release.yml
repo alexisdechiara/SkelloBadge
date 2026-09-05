@@ -1,0 +1,85 @@
+name: Publication
+
+# Une étiquette vXYZ déclenche la publication. Rien ne part sans geste explicite :
+# la clé de signature n'est jamais approchée par les constructions ordinaires.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  publier:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installer le JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Installer le SDK Android
+        uses: android-actions/setup-android@v3
+
+      - name: Mettre en place le cache Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Déterminer la version
+        id: version
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          echo "name=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Tests du moteur de planification
+        run: ./gradlew testDebugUnitTest
+
+      - name: Restaurer la clé de signature
+        env:
+          KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::Secret SIGNING_KEYSTORE_BASE64 absent : l'APK ne serait pas signé avec la clé de distribution."
+            exit 1
+          fi
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+
+      - name: Construire l'APK signé
+        env:
+          SIGNING_STORE_FILE: ${{ runner.temp }}/release.jks
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          APP_VERSION_NAME: ${{ steps.version.outputs.name }}
+          # Le numéro de run croît strictement : Android exige un code de version
+          # supérieur au précédent pour accepter une mise à jour.
+          APP_VERSION_CODE: ${{ github.run_number }}
+        run: ./gradlew assembleRelease
+
+      - name: Vérifier que l'APK porte bien la clé de distribution
+        run: |
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort | tail -1)
+          "$APKSIGNER" verify --print-certs app/build/outputs/apk/release/app-release.apk
+
+      - name: Nommer l'APK
+        id: apk
+        run: |
+          NAME="rappel-badgeuse-skello-${{ steps.version.outputs.name }}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "$NAME"
+          echo "path=$NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Publier la release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.version.outputs.tag }}" "${{ steps.apk.outputs.path }}" \
+            --title "Rappel Badgeuse Skello ${{ steps.version.outputs.name }}" \
+            --generate-notes
+
+      - name: Effacer la clé de signature
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.jks"

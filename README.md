@@ -144,8 +144,35 @@ La signature de distribution est décrite par `keystore.properties`, lui aussi h
 installation existante, qui devrait alors être désinstallée puis réinstallée. À sauvegarder
 ailleurs que sur cette machine.
 
-En l'absence de ces deux fichiers — sur un poste qui vient de cloner, ou dans la CI — la
-variante release retombe sur la clé de debug et le build fonctionne quand même.
+En l'absence de ces deux fichiers — sur un poste qui vient de cloner — la variante release
+retombe sur la clé de debug et le build fonctionne quand même, mais l'APK produit ne peut
+pas mettre à jour une installation signée avec la vraie clé.
+
+## Publier une version
+
+Une étiquette suffit :
+
+```bash
+git tag v1.1.0 && git push origin v1.1.0
+```
+
+Le workflow `Publication` compile, vérifie la signature et crée la release GitHub avec
+l'APK en pièce jointe. La clé de signature n'est pas lue depuis le disque mais depuis
+quatre secrets de dépôt — `SIGNING_KEYSTORE_BASE64`, `SIGNING_STORE_PASSWORD`,
+`SIGNING_KEY_ALIAS`, `SIGNING_KEY_PASSWORD` — reconstituée dans un fichier temporaire puis
+effacée en fin de travail. Seules les étiquettes déclenchent ce workflow : les
+constructions ordinaires n'approchent jamais la clé.
+
+Le nom de version vient de l'étiquette, le code de version du numéro de run, qui croît
+strictement — Android refuse une mise à jour dont le code de version n'augmente pas.
+
+**Sur un dépôt privé, les pièces jointes d'une release exigent un compte GitHub ayant accès
+au dépôt.** Pour un lien de téléchargement réellement ouvert, il faut rendre le dépôt
+public :
+
+```bash
+gh repo edit --visibility public --accept-visibility-change-consequences
+```
 
 Tests du moteur de planification :
 
