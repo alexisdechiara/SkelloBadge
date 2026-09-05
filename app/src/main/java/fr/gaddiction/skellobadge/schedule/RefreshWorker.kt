@@ -52,9 +52,16 @@ class RefreshWorker(
                 .map { it.title }
                 .toSet()
 
+            // Les journées déclarées travaillées ne valent que pour leur date : une fois
+            // passées, elles ne servent plus qu'à faire grossir les préférences.
+            val today = now.toLocalDate()
             settingsRepository.update {
                 it.copy(
                     knownShiftTypes = it.knownShiftTypes + discovered,
+                    workingStandbyDates = it.workingStandbyDates.filter { iso ->
+                        runCatching { !java.time.LocalDate.parse(iso).isBefore(today) }
+                            .getOrDefault(false)
+                    }.toSet(),
                     lastSyncEpochMillis = System.currentTimeMillis(),
                     lastSyncError = snapshot.error.orEmpty(),
                 )

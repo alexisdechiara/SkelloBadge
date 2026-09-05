@@ -3,6 +3,7 @@ package fr.gaddiction.skellobadge.domain
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalTime
+
 import java.time.ZonedDateTime
 
 /**
@@ -144,11 +145,23 @@ data class PlanningConfig(
 
     /** Types de service que l'utilisateur a explicitement mis en sourdine. */
     val disabledTypes: Set<String> = emptySet(),
+
+    /**
+     * Journées où l'utilisateur a déclaré qu'il travaillerait finalement. Elles rétablissent
+     * tous les rappels du jour, quelles que soient les règles de sourdine par ailleurs.
+     */
+    val workingDates: Set<LocalDate> = emptySet(),
 ) {
     /** Un créneau produit-il des rappels ? */
     fun notifiesFor(title: String): Boolean {
         if (title in disabledTypes) return false
         val normalized = title.lowercase()
         return standbyPatterns.none { it.isNotBlank() && normalized.contains(it.lowercase()) }
+    }
+
+    /** Le libellé désigne-t-il une journée de réserve, avant toute décision manuelle ? */
+    fun isStandbyTitle(title: String): Boolean {
+        val normalized = title.lowercase()
+        return standbyPatterns.any { it.isNotBlank() && normalized.contains(it.lowercase()) }
     }
 }

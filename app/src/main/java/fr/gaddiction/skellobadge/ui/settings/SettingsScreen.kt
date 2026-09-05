@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -13,7 +14,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -39,7 +42,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fr.gaddiction.skellobadge.data.AppSettings
 import fr.gaddiction.skellobadge.data.PlanningSource
-import fr.gaddiction.skellobadge.data.Wording
 import fr.gaddiction.skellobadge.domain.ReminderKind
 import fr.gaddiction.skellobadge.ui.AppViewModel
 import fr.gaddiction.skellobadge.ui.Haptics
@@ -51,18 +53,19 @@ import java.util.Locale
 
 private val STAMP = DateTimeFormatter.ofPattern("d MMMM 'à' HH'h'mm", Locale.FRANCE)
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(viewModel: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
     val fromPlanning by viewModel.shiftTypes.collectAsStateWithLifecycle()
     val haptics = rememberHaptics()
 
-    // La liste de sélection réunit ce que le planning montre aujourd'hui et tout ce que
-    // l'application a déjà rencontré : un service saisonnier ne disparaît pas des réglages
-    // parce qu'il est hors de la fenêtre courante.
+    // La liste réunit ce que le planning montre aujourd'hui et tout ce que l'application a
+    // déjà rencontré : un service saisonnier ne disparaît pas des réglages parce qu'il est
+    // hors de la fenêtre courante.
     val allTypes = remember(fromPlanning, settings.knownShiftTypes) {
         (fromPlanning + settings.knownShiftTypes).distinct().sorted()
     }
+    val standbyTypes = allTypes.filter { settings.isStandby(it) }
+    val selectableTypes = allTypes - standbyTypes.toSet()
 
     Scaffold(
         topBar = {
@@ -81,10 +84,10 @@ fun SettingsScreen(viewModel: AppViewModel, settings: AppSettings, onBack: () ->
                 .verticalScroll(rememberScrollState())
                 .padding(bottom = 32.dp),
         ) {
-            Expandable(
+            Section(
                 title = "Horaires",
-                summary = "Avance " + settings.clockInLeadMinutes + " min · bascule " +
-                    settings.shiftChangeMaxGapMinutes + " min",
+                summary = "Entrées " + settings.clockInLeadMinutes + " min avant · sorties " +
+                    settings.clockOutLeadMinutes + " min avant",
                 initiallyExpanded = true,
             ) {
                 Stepper(
@@ -95,11 +98,26 @@ fun SettingsScreen(viewModel: AppViewModel, settings: AppSettings, onBack: () ->
                 ) { viewModel.update { s -> s.copy(clockInLeadMinutes = it) } }
 
                 Stepper(
-                    "Avance sur le retour de coupure",
+                    "Avance sur le départ en pause",
+                    settings.breakOutLeadMinutes,
+                    0..30,
+                    haptics,
+                ) { viewModel.update { s -> s.copy(breakOutLeadMinutes = it) } }
+
+                Stepper(
+                    "Avance sur le retour de pause",
                     settings.breakInLeadMinutes,
                     0..30,
                     haptics,
                 ) { viewModel.update { s -> s.copy(breakInLeadMinutes = it) } }
+
+                Stepper(
+                    "Avance sur la fin de poste",
+                    settings.clockOutLeadMinutes,
+                    0..30,
+                    haptics,
+                    subtitle = "0 pour être rappelé à l'heure pile",
+                ) { viewModel.update { s -> s.copy(clockOutLeadMinutes = it) } }
 
                 Stepper(
                     "Écart maximal pour un enchaînement",
@@ -110,7 +128,7 @@ fun SettingsScreen(viewModel: AppViewModel, settings: AppSettings, onBack: () ->
                 ) { viewModel.update { s -> s.copy(shiftChangeMaxGapMinutes = it) } }
             }
 
-            Expandable(
+            Section(
                 title = "Insistance",
                 summary = if (settings.fullScreenAlarmEnabled) {
                     "Relance " + settings.nagIntervalMinutes + " min · alarme à " +
@@ -132,8 +150,7 @@ fun SettingsScreen(viewModel: AppViewModel, settings: AppSettings, onBack: () ->
                     supportingContent = {
                         Text(
                             "Passé le délai, le rappel s'affiche par-dessus l'écran de " +
-                                "verrouillage, sonne en boucle sur le flux des alarmes et " +
-                                "vibre jusqu'à ce qu'on y réponde.",
+                                "verrouillage, sonne en boucle et vibre jusqu'à ce qu'on y réponde.",
                         )
                     },
                     trailingContent = {
@@ -156,16 +173,16 @@ fun SettingsScreen(viewModel: AppViewModel, settings: AppSettings, onBack: () ->
                 }
             }
 
-            Expandable(
-                title = "Coupure de midi",
+            Section(
+                title = "Pause",
                 summary = if (settings.lunchFallbackEnabled) "Forcée à 12h et 13h" else "Désactivée",
             ) {
                 ListItem(
-                    headlineContent = { Text("Coupure de midi forcée") },
+                    headlineContent = { Text("Pause de midi forcée") },
                     supportingContent = {
                         Text(
                             "Ajoute un rappel à 12h et 13h sur les journées longues dont le " +
-                                "planning ne prévoit aucune coupure.",
+                                "planning ne prévoit aucune pause.",
                         )
                     },
                     trailingContent = {
@@ -180,91 +197,55 @@ fun SettingsScreen(viewModel: AppViewModel, settings: AppSettings, onBack: () ->
                 )
             }
 
-            Expandable(
+            Section(
                 title = "Formulation des rappels",
                 summary = "Titre et texte de chaque type",
             ) {
-                Text(
-                    "Dans le texte, {heure} sera remplacé par l'heure de l'action et " +
-                        "{poste} par le nom du service.",
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
-                )
-                ReminderKind.entries.forEach { kind ->
-                    WordingBlock(kind, settings.wordingFor(kind), haptics) { updated ->
-                        viewModel.update { it.copy(wording = it.wording + (kind to updated)) }
-                    }
+                WordingEditor(settings, haptics) { kind, wording ->
+                    viewModel.update { it.copy(wording = it.wording + (kind to wording)) }
                 }
             }
 
-            Expandable(
+            Section(
                 title = "Services concernés",
-                summary = servicesSummary(allTypes, settings),
+                summary = servicesSummary(selectableTypes, settings),
             ) {
-                Text(
-                    "Touche un service pour le couper ou le réactiver. Ceux dont le libellé " +
-                        "contient « ou off » sont des journées de réserve : ils restent au " +
-                        "planning sans jamais sonner.",
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
-                )
-
-                if (allTypes.isEmpty()) {
-                    Text(
-                        "Aucun service lu pour l'instant.",
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(horizontal = 20.dp),
-                    )
-                } else {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 20.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        TextButton(onClick = {
-                            haptics.confirm()
-                            viewModel.update { it.copy(disabledShiftTypes = emptySet()) }
-                        }) { Text("Tout activer") }
-
-                        TextButton(onClick = {
-                            haptics.click()
-                            viewModel.update { it.copy(disabledShiftTypes = allTypes.toSet()) }
-                        }) { Text("Tout couper") }
-                    }
-
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
-                        allTypes.forEach { type ->
-                            val standby = settings.standbyPatterns.any {
-                                it.isNotBlank() && type.lowercase().contains(it.lowercase())
-                            }
-                            val active = !standby && type !in settings.disabledShiftTypes
-                            FilterChip(
-                                selected = active,
-                                enabled = !standby,
-                                onClick = {
-                                    haptics.toggle(!active)
-                                    viewModel.update { s ->
-                                        val disabled = s.disabledShiftTypes.toMutableSet()
-                                        if (active) disabled += type else disabled -= type
-                                        s.copy(disabledShiftTypes = disabled)
-                                    }
-                                },
-                                label = { Text(type) },
-                                leadingIcon = if (active) {
-                                    { Text("✓") }
-                                } else {
-                                    null
-                                },
+                ServiceSelector(
+                    types = selectableTypes,
+                    disabled = settings.disabledShiftTypes,
+                    haptics = haptics,
+                    onToggle = { type, active ->
+                        viewModel.update { s ->
+                            val muted = s.disabledShiftTypes.toMutableSet()
+                            if (active) muted -= type else muted += type
+                            s.copy(disabledShiftTypes = muted)
+                        }
+                    },
+                    onAll = { active ->
+                        viewModel.update { s ->
+                            s.copy(
+                                disabledShiftTypes = if (active) emptySet() else selectableTypes.toSet(),
                             )
                         }
-                    }
+                    },
+                )
+
+                if (standbyTypes.isNotEmpty()) {
+                    Text(
+                        "Journées de réserve, jamais de rappel : " +
+                            standbyTypes.joinToString(", ") +
+                            ". Sur la carte du jour, un bouton permet de les réactiver " +
+                            "quand tu es finalement appelé.",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                    )
                 }
             }
 
-            Expandable(title = "Configuration", summary = settings.targetLabel.ifBlank { "Badgeuse" }) {
+            Section(
+                title = "Configuration",
+                summary = settings.targetLabel.ifBlank { "Badgeuse" },
+            ) {
                 Info(
                     "Source",
                     when (settings.source) {
@@ -320,18 +301,140 @@ fun SettingsScreen(viewModel: AppViewModel, settings: AppSettings, onBack: () ->
     }
 }
 
-private fun servicesSummary(all: List<String>, settings: AppSettings): String {
-    if (all.isEmpty()) return "Aucun service connu"
-    val muted = all.count { type ->
-        type in settings.disabledShiftTypes ||
-            settings.standbyPatterns.any {
-                it.isNotBlank() && type.lowercase().contains(it.lowercase())
-            }
+/**
+ * Sélection multiple en liste déroulante.
+ *
+ * Des puces à plat étaient lisibles tant que les services se comptaient sur une main ;
+ * l'établissement en accumulant de nouveaux au fil des mois, elles finiraient par occuper
+ * plusieurs écrans. La liste déroulante garde une hauteur constante quel qu'en soit le
+ * nombre, et le champ résume l'état sans avoir à l'ouvrir.
+ */
+@Composable
+private fun ServiceSelector(
+    types: List<String>,
+    disabled: Set<String>,
+    haptics: Haptics,
+    onToggle: (String, Boolean) -> Unit,
+    onAll: (Boolean) -> Unit,
+) {
+    if (types.isEmpty()) {
+        Text(
+            "Aucun service lu pour l'instant.",
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+        )
+        return
     }
+
+    var expanded by remember { mutableStateOf(false) }
+    val active = types.count { it !in disabled }
+
+    Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp)) {
+        OutlinedButton(
+            onClick = {
+                haptics.click()
+                expanded = true
+            },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(
+                active.toString() + " service(s) sur " + types.size + " déclenchent des rappels",
+                modifier = Modifier.weight(1f),
+                textAlign = TextAlign.Start,
+            )
+            Text("⌄")
+        }
+
+        // Le menu reste à hauteur constante et défile de lui-même : la liste peut grossir
+        // sans jamais repousser le reste des réglages hors de l'écran.
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            types.forEach { type ->
+                val checked = type !in disabled
+                DropdownMenuItem(
+                    text = { Text(type) },
+                    leadingIcon = { Checkbox(checked = checked, onCheckedChange = null) },
+                    onClick = {
+                        haptics.toggle(!checked)
+                        onToggle(type, !checked)
+                    },
+                )
+            }
+        }
+    }
+
+    Row(
+        modifier = Modifier.padding(horizontal = 20.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        TextButton(onClick = { haptics.confirm(); onAll(true) }) { Text("Tout activer") }
+        TextButton(onClick = { haptics.click(); onAll(false) }) { Text("Tout couper") }
+    }
+}
+
+/**
+ * Éditeur de formulation à un seul niveau : on choisit le type par une puce, puis on
+ * modifie ses deux champs juste en dessous. Empiler un dépliage par type à l'intérieur
+ * d'une section déjà dépliable obligeait à deux gestes pour atteindre un champ.
+ */
+@Composable
+private fun WordingEditor(
+    settings: AppSettings,
+    haptics: Haptics,
+    onChange: (ReminderKind, fr.gaddiction.skellobadge.data.Wording) -> Unit,
+) {
+    var selected by remember { mutableStateOf(ReminderKind.CLOCK_IN) }
+    val wording = settings.wordingFor(selected)
+
+    FlowRow(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        ReminderKind.entries.forEach { kind ->
+            FilterChip(
+                selected = kind == selected,
+                onClick = {
+                    haptics.click()
+                    selected = kind
+                },
+                label = { Text(kindLabel(kind)) },
+            )
+        }
+    }
+
+    Column(
+        modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        OutlinedTextField(
+            value = wording.title,
+            onValueChange = { onChange(selected, wording.copy(title = it)) },
+            label = { Text("Titre") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            value = wording.body,
+            onValueChange = { onChange(selected, wording.copy(body = it)) },
+            label = { Text("Texte") },
+            supportingText = {
+                Text("{heure} devient l'heure de l'action, {poste} le nom du service")
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+private fun servicesSummary(types: List<String>, settings: AppSettings): String {
+    if (types.isEmpty()) return "Aucun service connu"
+    val muted = types.count { it in settings.disabledShiftTypes }
     return if (muted == 0) {
-        all.size.toString() + " services, tous actifs"
+        types.size.toString() + " services, tous actifs"
     } else {
-        all.size.toString() + " services, " + muted + " sans rappel"
+        types.size.toString() + " services, " + muted + " sans rappel"
     }
 }
 
@@ -341,7 +444,7 @@ private fun servicesSummary(all: List<String>, settings: AppSettings): String {
  * que le résumé porté par l'en-tête suffit le plus souvent.
  */
 @Composable
-private fun Expandable(
+private fun Section(
     title: String,
     summary: String,
     initiallyExpanded: Boolean = false,
@@ -382,63 +485,10 @@ private fun Expandable(
     }
 }
 
-@Composable
-private fun WordingBlock(
-    kind: ReminderKind,
-    wording: Wording,
-    haptics: Haptics,
-    onChange: (Wording) -> Unit,
-) {
-    var open by remember { mutableStateOf(false) }
-    val rotation by animateFloatAsState(if (open) 180f else 0f, label = "chevron-wording")
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable {
-                haptics.click()
-                open = !open
-            }
-            .padding(horizontal = 20.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(kindLabel(kind), style = MaterialTheme.typography.bodyLarge)
-            Text(
-                wording.title,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        Text("⌄", modifier = Modifier.rotate(rotation))
-    }
-
-    AnimatedVisibility(visible = open) {
-        Column(
-            modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            OutlinedTextField(
-                value = wording.title,
-                onValueChange = { onChange(wording.copy(title = it)) },
-                label = { Text("Titre") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            OutlinedTextField(
-                value = wording.body,
-                onValueChange = { onChange(wording.copy(body = it)) },
-                label = { Text("Texte") },
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-    }
-}
-
 private fun kindLabel(kind: ReminderKind): String = when (kind) {
     ReminderKind.CLOCK_IN -> "Arrivée"
-    ReminderKind.BREAK_OUT -> "Départ en coupure"
-    ReminderKind.BREAK_IN -> "Retour de coupure"
+    ReminderKind.BREAK_OUT -> "Départ en pause"
+    ReminderKind.BREAK_IN -> "Retour de pause"
     ReminderKind.SHIFT_CHANGE -> "Changement de poste"
     ReminderKind.CLOCK_OUT -> "Départ"
 }

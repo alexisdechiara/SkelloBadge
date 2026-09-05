@@ -9,6 +9,7 @@ import fr.gaddiction.skellobadge.domain.PlanningConfig
 import fr.gaddiction.skellobadge.domain.PlanningEngine
 import fr.gaddiction.skellobadge.domain.PlanningEvent
 import java.time.Duration
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZonedDateTime
 
@@ -106,8 +107,14 @@ class PlanningRepository(
 fun AppSettings.toPlanningConfig(): PlanningConfig = PlanningConfig(
     clockInLead = Duration.ofMinutes(clockInLeadMinutes.toLong()),
     breakInLead = Duration.ofMinutes(breakInLeadMinutes.toLong()),
+    breakOutLead = Duration.ofMinutes(breakOutLeadMinutes.toLong()),
+    clockOutLead = Duration.ofMinutes(clockOutLeadMinutes.toLong()),
     shiftChangeMaxGap = Duration.ofMinutes(shiftChangeMaxGapMinutes.toLong()),
     lunchFallbackEnabled = lunchFallbackEnabled,
     standbyPatterns = standbyPatterns,
     disabledTypes = disabledShiftTypes,
+    workingDates = workingStandbyDates.mapNotNull(::parseIsoDate).toSet(),
 )
+
+/** Une date illisible en préférence ne doit pas faire échouer toute la planification. */
+private fun parseIsoDate(iso: String): LocalDate? = runCatching { LocalDate.parse(iso) }.getOrNull()

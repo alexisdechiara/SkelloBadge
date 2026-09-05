@@ -49,11 +49,21 @@ object PlanningEngine {
         dayEvents.firstOrNull { isNonWorkingMarker(it, config) }
             ?.let { return DayPlan.Off(date, it.title) }
 
+        // Journée déclarée travaillée : tout sonne, y compris ce que les règles de sourdine
+        // auraient tu. C'est un choix explicite de l'utilisateur pour cette date précise.
+        val forced = date in config.workingDates
+
         val blocks = dayEvents
             .filter { it.duration > Duration.ZERO }
             .sortedWith(compareBy({ it.start }, { it.end }))
             .map {
-                WorkBlock(it.start, it.end, it.title, it.note, config.notifiesFor(it.title))
+                WorkBlock(
+                    start = it.start,
+                    end = it.end,
+                    title = it.title,
+                    note = it.note,
+                    notifies = forced || config.notifiesFor(it.title),
+                )
             }
 
         if (blocks.isEmpty()) return DayPlan.Empty(date)

@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZonedDateTime
 
@@ -70,6 +71,21 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun resetLinkCheck() {
         _linkCheck.value = LinkCheck.Idle
+    }
+
+    /**
+     * Bascule une journée de réserve en journée travaillée, et inversement.
+     *
+     * C'est le geste qui rattrape le cas le plus risqué : le jour où l'on est appelé en
+     * renfort sur un créneau qui, par défaut, ne sonne pas.
+     */
+    fun toggleWorkingDay(date: LocalDate) {
+        val key = date.toString()
+        update { settings ->
+            val dates = settings.workingStandbyDates.toMutableSet()
+            if (key in dates) dates -= key else dates += key
+            settings.copy(workingStandbyDates = dates)
+        }
     }
 
     /** Programme un rappel de démonstration dans quelques secondes. */

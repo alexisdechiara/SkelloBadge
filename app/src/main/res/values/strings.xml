@@ -6,7 +6,7 @@
 
     <string name="channel_clock_in_name">Prise de poste</string>
     <string name="channel_clock_in_desc">Rappel avant le début du service</string>
-    <string name="channel_break_name">Coupure</string>
+    <string name="channel_break_name">Pause</string>
     <string name="channel_break_desc">Départ en pause et reprise</string>
     <string name="channel_clock_out_name">Fin de poste</string>
     <string name="channel_clock_out_desc">Rappel de badgeage en fin de service</string>

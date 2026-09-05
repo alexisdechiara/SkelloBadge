@@ -181,6 +181,44 @@ class PlanningEngineTest {
         assertTrue(plan.reminders.isEmpty())
     }
 
+    /**
+     * Le jour où l'on est effectivement appelé en renfort est celui où un oubli coûte le
+     * plus cher. Déclarer la journée travaillée doit donc rétablir tous ses rappels.
+     */
+    @Test
+    fun `declaring a standby day as worked restores its reminders`() {
+        val date = LocalDate.parse("2026-09-06")
+        val plan = work("2026-09-06", config.copy(workingDates = setOf(date)))
+
+        assertTrue(plan.blocks.single().notifies)
+        assertEquals(
+            listOf(ReminderKind.CLOCK_IN, ReminderKind.CLOCK_OUT),
+            plan.reminders.map { it.kind },
+        )
+        assertEquals(LocalTime.of(12, 59), at(plan.reminders.first()))
+        assertEquals(LocalTime.of(19, 0), at(plan.reminders.last()))
+    }
+
+    /** La déclaration l'emporte aussi sur une mise en sourdine par type. */
+    @Test
+    fun `declaring a day as worked overrides a muted shift type`() {
+        val date = LocalDate.parse("2026-09-04")
+        val muted = config.copy(
+            disabledTypes = setOf("Equipe Mobile"),
+            workingDates = setOf(date),
+        )
+        val plan = work("2026-09-04", muted)
+
+        assertTrue(plan.blocks.single().notifies)
+        assertEquals(2, plan.reminders.size)
+    }
+
+    @Test
+    fun `a day not declared as worked stays silent`() {
+        val other = config.copy(workingDates = setOf(LocalDate.parse("2026-09-14")))
+        assertTrue(work("2026-09-06", other).reminders.isEmpty())
+    }
+
     @Test
     fun `clearing the standby patterns makes the joker shift ring again`() {
         val plan = work("2026-09-06", config.copy(standbyPatterns = emptySet()))

@@ -40,7 +40,7 @@ data class Wording(val title: String, val body: String) {
             ),
             ReminderKind.BREAK_OUT to Wording(
                 "Badge ta sortie",
-                "Coupure à partir de {heure}",
+                "Pause à partir de {heure}",
             ),
             ReminderKind.BREAK_IN to Wording(
                 "Badge ton retour",
@@ -78,6 +78,9 @@ data class AppSettings(
      */
     val clockInLeadMinutes: Int = 1,
     val breakInLeadMinutes: Int = 1,
+    /** Les sorties sont rappelées à l'heure pile par défaut : badger trop tôt fausserait le pointage. */
+    val breakOutLeadMinutes: Int = 0,
+    val clockOutLeadMinutes: Int = 0,
     val shiftChangeMaxGapMinutes: Int = 5,
 
     /** Intervalle entre deux relances tant que le badgeage n'est pas confirmé. */
@@ -99,6 +102,15 @@ data class AppSettings(
      */
     val standbyPatterns: Set<String> = setOf("ou off"),
 
+    /**
+     * Dates, au format ISO, où l'utilisateur a déclaré qu'il travaillerait finalement.
+     *
+     * Une journée de réserve ne sonne pas, mais c'est justement le jour où l'on est appelé
+     * en renfort qu'un oubli coûte le plus cher : ce jour-là, un bouton sur la carte du
+     * jour rétablit tous les rappels.
+     */
+    val workingStandbyDates: Set<String> = emptySet(),
+
     /** Types de service explicitement mis en sourdine par l'utilisateur. */
     val disabledShiftTypes: Set<String> = emptySet(),
 
@@ -117,6 +129,15 @@ data class AppSettings(
 ) {
     fun wordingFor(kind: ReminderKind): Wording =
         wording[kind] ?: Wording.DEFAULTS.getValue(kind)
+
+    /** Le libellé désigne-t-il une journée de réserve ? */
+    fun isStandby(title: String): Boolean {
+        val normalized = title.lowercase()
+        return standbyPatterns.any { it.isNotBlank() && normalized.contains(it.lowercase()) }
+    }
+
+    /** L'utilisateur a-t-il déclaré qu'il travaillerait ce jour-là ? */
+    fun worksOn(date: java.time.LocalDate): Boolean = date.toString() in workingStandbyDates
 
     /** Vrai si l'application dispose de tout ce qu'il lui faut pour travailler seule. */
     val isUsable: Boolean

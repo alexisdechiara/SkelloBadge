@@ -40,7 +40,10 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.TARGET_URL] = updated.targetUrl
             prefs[Keys.CLOCK_IN_LEAD] = updated.clockInLeadMinutes
             prefs[Keys.BREAK_IN_LEAD] = updated.breakInLeadMinutes
+            prefs[Keys.BREAK_OUT_LEAD] = updated.breakOutLeadMinutes
+            prefs[Keys.CLOCK_OUT_LEAD] = updated.clockOutLeadMinutes
             prefs[Keys.SHIFT_CHANGE_GAP] = updated.shiftChangeMaxGapMinutes
+            prefs[Keys.WORKING_DATES] = updated.workingStandbyDates
             prefs[Keys.NAG_INTERVAL] = updated.nagIntervalMinutes
             prefs[Keys.NAG_MAX] = updated.nagMaxCount
             prefs[Keys.FULLSCREEN_ENABLED] = updated.fullScreenAlarmEnabled
@@ -80,6 +83,9 @@ class SettingsRepository(private val context: Context) {
             targetUrl = prefs[Keys.TARGET_URL] ?: defaults.targetUrl,
             clockInLeadMinutes = prefs[Keys.CLOCK_IN_LEAD] ?: defaults.clockInLeadMinutes,
             breakInLeadMinutes = prefs[Keys.BREAK_IN_LEAD] ?: defaults.breakInLeadMinutes,
+            breakOutLeadMinutes = prefs[Keys.BREAK_OUT_LEAD] ?: defaults.breakOutLeadMinutes,
+            clockOutLeadMinutes = prefs[Keys.CLOCK_OUT_LEAD] ?: defaults.clockOutLeadMinutes,
+            workingStandbyDates = prefs[Keys.WORKING_DATES] ?: defaults.workingStandbyDates,
             shiftChangeMaxGapMinutes = prefs[Keys.SHIFT_CHANGE_GAP]
                 ?: defaults.shiftChangeMaxGapMinutes,
             nagIntervalMinutes = prefs[Keys.NAG_INTERVAL] ?: defaults.nagIntervalMinutes,
@@ -121,6 +127,9 @@ class SettingsRepository(private val context: Context) {
         val TARGET_URL = stringPreferencesKey("target_url")
         val CLOCK_IN_LEAD = intPreferencesKey("clock_in_lead")
         val BREAK_IN_LEAD = intPreferencesKey("break_in_lead")
+        val BREAK_OUT_LEAD = intPreferencesKey("break_out_lead")
+        val CLOCK_OUT_LEAD = intPreferencesKey("clock_out_lead")
+        val WORKING_DATES = stringSetPreferencesKey("working_standby_dates")
         val SHIFT_CHANGE_GAP = intPreferencesKey("shift_change_gap")
         val NAG_INTERVAL = intPreferencesKey("nag_interval")
         val NAG_MAX = intPreferencesKey("nag_max")

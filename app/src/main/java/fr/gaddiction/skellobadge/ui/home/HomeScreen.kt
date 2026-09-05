@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -23,15 +24,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fr.gaddiction.skellobadge.R
@@ -120,7 +116,14 @@ fun HomeScreen(viewModel: AppViewModel, settings: AppSettings, onOpenSettings: (
                         lastWeekStart = weekStart
                         item(key = "week-" + weekStart) { WeekHeader(weekStart, today) }
                     }
-                    item(key = day.date.toString()) { DayCard(day, today) }
+                    item(key = day.date.toString()) {
+                        DayCard(
+                            day = day,
+                            today = today,
+                            declaredWorking = settings.worksOn(day.date),
+                            onToggleWorking = { viewModel.toggleWorkingDay(day.date) },
+                        )
+                    }
                 }
             }
         }
@@ -177,8 +180,10 @@ private fun NextReminderCard(reminder: Reminder?, now: ZonedDateTime) {
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
             )
+            // Date brute : le compte à rebours au-dessus porte déjà « demain » ou
+            // « dans 2 jours », et le répéter ici ne dirait rien de plus.
             Text(
-                dayLabel(reminder.at.toLocalDate(), now.toLocalDate()) +
+                DAY.format(reminder.at).replaceFirstChar { it.uppercase() } +
                     " à " + TIME.format(reminder.at),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -220,21 +225,17 @@ private fun SyncWarningCard(error: String, fromCache: Boolean) {
 }
 
 @Composable
-private fun DayCard(day: DayPlan, today: LocalDate) {
+private fun DayCard(
+    day: DayPlan,
+    today: LocalDate,
+    declaredWorking: Boolean,
+    onToggleWorking: () -> Unit,
+) {
     val isToday = day.date == today
     val isRest = day is DayPlan.Off || day is DayPlan.Empty
     val haptics = rememberHaptics()
 
-    // Les notes du planning sont parfois très longues — liste de prénoms, consignes de
-    // trajet. Repliées, elles laissent la journée lisible d'un coup d'œil ; un appui sur
-    // la carte les déplie quand on en a besoin.
-    var notesExpanded by remember(day.date) { mutableStateOf(false) }
-
     Card(
-        onClick = {
-            haptics.click()
-            notesExpanded = !notesExpanded
-        },
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = when {
@@ -274,7 +275,7 @@ private fun DayCard(day: DayPlan, today: LocalDate) {
                 )
 
                 is DayPlan.Work -> {
-                    day.blocks.forEach { block -> BlockRow(block, notesExpanded) }
+                    day.blocks.forEach { block -> BlockRow(block) }
 
                     if (day.reminders.isEmpty()) {
                         Text(
@@ -283,7 +284,29 @@ private fun DayCard(day: DayPlan, today: LocalDate) {
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 8.dp),
                         )
+                        // Le jour où l'on est appelé en renfort est celui où un oubli coûte
+                        // le plus cher : il faut pouvoir rétablir les rappels d'un geste.
+                        FilledTonalButton(
+                            onClick = { haptics.confirm(); onToggleWorking() },
+                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        ) { Text("Je travaille ce jour") }
                     } else {
+                        if (declaredWorking) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(top = 8.dp),
+                            ) {
+                                Text(
+                                    "Rappels rétablis pour ce jour",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                TextButton(onClick = { haptics.click(); onToggleWorking() }) {
+                                    Text("Annuler")
+                                }
+                            }
+                        }
                         // Une journée coupée porte quatre rappels : sur un écran étroit ils
                         // doivent pouvoir passer à la ligne plutôt que d'être tronqués.
                         FlowRow(
@@ -300,43 +323,32 @@ private fun DayCard(day: DayPlan, today: LocalDate) {
     }
 }
 
+/**
+ * Une ligne par créneau. La note du planning n'y figure pas : elle atteint parfois dix
+ * lignes de consignes et de prénoms, ce qui noyait la journée. Elle reste là où elle est
+ * utile, dans la notification du moment venu.
+ */
 @Composable
-private fun BlockRow(block: WorkBlock, notesExpanded: Boolean) {
-    Column(modifier = Modifier.padding(top = 6.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                TIME.format(block.start) + " – " + TIME.format(block.end),
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = if (block.notifies) {
-                    MaterialTheme.colorScheme.onSurface
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-            )
-            Text(
-                "  " + block.title,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        // La note du planning porte souvent l'information la plus concrète de la journée :
-        // heure de rendez-vous réelle, personne à confirmer, lieu précis.
-        block.note?.takeIf(String::isNotBlank)?.let { note ->
-            val flattened = note.lines()
-                .map(String::trim)
-                .filter(String::isNotEmpty)
-                .joinToString(" · ")
-            Text(
-                flattened,
-                style = MaterialTheme.typography.bodySmall,
-                fontStyle = FontStyle.Italic,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = if (notesExpanded) Int.MAX_VALUE else 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 2.dp),
-            )
-        }
+private fun BlockRow(block: WorkBlock) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(top = 6.dp),
+    ) {
+        Text(
+            TIME.format(block.start) + " – " + TIME.format(block.end),
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = if (block.notifies) {
+                MaterialTheme.colorScheme.onSurface
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+        )
+        Text(
+            "  " + block.title,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -406,8 +418,8 @@ private fun formatDuration(duration: Duration): String {
 
 private fun label(kind: ReminderKind): String = when (kind) {
     ReminderKind.CLOCK_IN -> "Prise de poste"
-    ReminderKind.BREAK_OUT -> "Départ en coupure"
-    ReminderKind.BREAK_IN -> "Retour de coupure"
+    ReminderKind.BREAK_OUT -> "Départ en pause"
+    ReminderKind.BREAK_IN -> "Retour de pause"
     ReminderKind.SHIFT_CHANGE -> "Changement de poste"
     ReminderKind.CLOCK_OUT -> "Fin de poste"
 }
