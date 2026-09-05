@@ -58,6 +58,7 @@ import fr.gaddiction.skellobadge.data.BadgeTarget
 import fr.gaddiction.skellobadge.data.InstalledApps
 import fr.gaddiction.skellobadge.data.PlanningSource
 import fr.gaddiction.skellobadge.ui.AppViewModel
+import fr.gaddiction.skellobadge.ui.rememberHaptics
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -68,6 +69,7 @@ import kotlinx.coroutines.withContext
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OnboardingScreen(viewModel: AppViewModel, settings: AppSettings) {
+    val haptics = rememberHaptics()
     var step by remember { mutableStateOf(0) }
     var draft by remember { mutableStateOf(settings) }
 
@@ -109,12 +111,13 @@ fun OnboardingScreen(viewModel: AppViewModel, settings: AppSettings) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 TextButton(
-                    onClick = { step-- },
+                    onClick = { haptics.click(); step-- },
                     enabled = step > 0,
                 ) { Text("Retour") }
 
                 Button(
                     onClick = {
+                        haptics.confirm()
                         if (step < STEP_COUNT - 1) {
                             step++
                         } else {
@@ -137,6 +140,7 @@ private fun SourceStep(
     onChange: (AppSettings) -> Unit,
 ) {
     val context = LocalContext.current
+    val haptics = rememberHaptics()
 
     Text(
         "D'où vient ton planning ?",
@@ -146,12 +150,18 @@ private fun SourceStep(
     SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
         SegmentedButton(
             selected = draft.source == PlanningSource.ICS,
-            onClick = { onChange(draft.copy(source = PlanningSource.ICS)) },
+            onClick = {
+                haptics.click()
+                onChange(draft.copy(source = PlanningSource.ICS))
+            },
             shape = SegmentedButtonDefaults.itemShape(0, 2),
         ) { Text("Lien ICS") }
         SegmentedButton(
             selected = draft.source == PlanningSource.DEVICE_CALENDAR,
-            onClick = { onChange(draft.copy(source = PlanningSource.DEVICE_CALENDAR)) },
+            onClick = {
+                haptics.click()
+                onChange(draft.copy(source = PlanningSource.DEVICE_CALENDAR))
+            },
             shape = SegmentedButtonDefaults.itemShape(1, 2),
         ) { Text("Calendrier") }
     }
@@ -178,7 +188,7 @@ private fun SourceStep(
             )
 
             OutlinedButton(
-                onClick = { viewModel.verifyIcsLink(draft.icsUrl) },
+                onClick = { haptics.confirm(); viewModel.verifyIcsLink(draft.icsUrl) },
                 enabled = draft.icsUrl.startsWith("http") &&
                     check !is AppViewModel.LinkCheck.Running,
                 modifier = Modifier.fillMaxWidth(),
@@ -244,6 +254,7 @@ private fun SourceStep(
 @Composable
 private fun TargetStep(draft: AppSettings, onChange: (AppSettings) -> Unit) {
     val context = LocalContext.current
+    val haptics = rememberHaptics()
 
     Text(
         "Qu'ouvre-t-on quand tu touches la notification ?",
@@ -253,12 +264,18 @@ private fun TargetStep(draft: AppSettings, onChange: (AppSettings) -> Unit) {
     SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
         SegmentedButton(
             selected = draft.targetKind == BadgeTarget.APP,
-            onClick = { onChange(draft.copy(targetKind = BadgeTarget.APP)) },
+            onClick = {
+                haptics.click()
+                onChange(draft.copy(targetKind = BadgeTarget.APP))
+            },
             shape = SegmentedButtonDefaults.itemShape(0, 2),
         ) { Text("Une application") }
         SegmentedButton(
             selected = draft.targetKind == BadgeTarget.URL,
-            onClick = { onChange(draft.copy(targetKind = BadgeTarget.URL)) },
+            onClick = {
+                haptics.click()
+                onChange(draft.copy(targetKind = BadgeTarget.URL))
+            },
             shape = SegmentedButtonDefaults.itemShape(1, 2),
         ) { Text("Une adresse web") }
     }
@@ -330,6 +347,7 @@ private fun TargetStep(draft: AppSettings, onChange: (AppSettings) -> Unit) {
 @Composable
 private fun PermissionsStep() {
     val context = LocalContext.current
+    val haptics = rememberHaptics()
     val notificationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { }
@@ -347,13 +365,16 @@ private fun PermissionsStep() {
 
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         OutlinedButton(
-            onClick = { notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) },
+            onClick = {
+                haptics.click()
+                notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            },
             modifier = Modifier.fillMaxWidth(),
         ) { Text("Autoriser les notifications") }
     }
 
     OutlinedButton(
-        onClick = { context.requestIgnoreBatteryOptimizations() },
+        onClick = { haptics.click(); context.requestIgnoreBatteryOptimizations() },
         enabled = !context.isIgnoringBatteryOptimizations(),
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -371,7 +392,7 @@ private fun PermissionsStep() {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
         val allowed = context.canUseFullScreenIntent()
         OutlinedButton(
-            onClick = { context.requestFullScreenIntent() },
+            onClick = { haptics.click(); context.requestFullScreenIntent() },
             enabled = !allowed,
             modifier = Modifier.fillMaxWidth(),
         ) {

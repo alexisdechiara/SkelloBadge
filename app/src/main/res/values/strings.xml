@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Badgeuse</string>
+    <string name="app_name">Rappel Badgeuse Skello</string>
+    <!-- Nom court, pour la barre de titre où le nom complet déborderait. -->
+    <string name="app_name_short">Rappel Badgeuse</string>
 
     <string name="channel_clock_in_name">Prise de poste</string>
     <string name="channel_clock_in_desc">Rappel avant le début du service</string>

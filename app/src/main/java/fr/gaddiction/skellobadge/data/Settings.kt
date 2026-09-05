@@ -102,6 +102,13 @@ data class AppSettings(
     /** Types de service explicitement mis en sourdine par l'utilisateur. */
     val disabledShiftTypes: Set<String> = emptySet(),
 
+    /**
+     * Tous les types de service jamais rencontrés dans le planning, accumulés au fil des
+     * synchronisations. Sans cette mémoire, un type absent de la fenêtre courante
+     * disparaîtrait de la liste de sélection, et son réglage deviendrait inatteignable.
+     */
+    val knownShiftTypes: Set<String> = emptySet(),
+
     /** Formulation de chaque type de rappel. Toute entrée absente retombe sur le défaut. */
     val wording: Map<ReminderKind, Wording> = Wording.DEFAULTS,
 

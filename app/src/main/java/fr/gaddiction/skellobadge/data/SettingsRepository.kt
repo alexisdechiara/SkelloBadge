@@ -48,6 +48,7 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.LUNCH_FALLBACK] = updated.lunchFallbackEnabled
             prefs[Keys.STANDBY_PATTERNS] = updated.standbyPatterns
             prefs[Keys.DISABLED_TYPES] = updated.disabledShiftTypes
+            prefs[Keys.KNOWN_TYPES] = updated.knownShiftTypes
             prefs[Keys.LAST_SYNC] = updated.lastSyncEpochMillis
             prefs[Keys.LAST_SYNC_ERROR] = updated.lastSyncError
 
@@ -90,6 +91,7 @@ class SettingsRepository(private val context: Context) {
             lunchFallbackEnabled = prefs[Keys.LUNCH_FALLBACK] ?: defaults.lunchFallbackEnabled,
             standbyPatterns = prefs[Keys.STANDBY_PATTERNS] ?: defaults.standbyPatterns,
             disabledShiftTypes = prefs[Keys.DISABLED_TYPES] ?: defaults.disabledShiftTypes,
+            knownShiftTypes = prefs[Keys.KNOWN_TYPES] ?: defaults.knownShiftTypes,
             wording = ReminderKind.entries.associateWith { kind ->
                 val fallback = Wording.DEFAULTS.getValue(kind)
                 Wording(
@@ -127,6 +129,7 @@ class SettingsRepository(private val context: Context) {
         val LUNCH_FALLBACK = booleanPreferencesKey("lunch_fallback")
         val STANDBY_PATTERNS = stringSetPreferencesKey("standby_patterns")
         val DISABLED_TYPES = stringSetPreferencesKey("disabled_types")
+        val KNOWN_TYPES = stringSetPreferencesKey("known_types")
         val LAST_SYNC = longPreferencesKey("last_sync")
         val LAST_SYNC_ERROR = stringPreferencesKey("last_sync_error")
     }

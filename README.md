@@ -1,4 +1,4 @@
-# Badgeuse
+# Rappel Badgeuse Skello
 
 Rappels de badgeage Android, calés sur un planning Skello. On la configure une fois,
 puis on l'oublie : elle lit le planning toute seule, pose ses alarmes, et la
@@ -25,9 +25,14 @@ Le timing étant contrôlé de près, un rappel ignoré ne s'efface pas :
 
 1. **Relance chaque minute** tant que le badgeage n'est pas confirmé.
 2. **Au bout de 5 minutes**, l'application passe à l'**alarme plein écran** : elle rallume
-   l'écran, s'affiche par-dessus le verrouillage avec le son et le flux audio des alarmes,
-   et propose un bouton unique vers la badgeuse. Une notification se balaie sans y penser ;
-   pas cet écran.
+   l'écran, s'affiche par-dessus le verrouillage, **sonne en boucle** sur le flux audio des
+   alarmes et **vibre** sans interruption, avec un bouton unique vers la badgeuse. Une
+   notification se balaie sans y penser ; pas cet écran.
+
+   La vibration part dans tous les cas, y compris en mode vibreur ou silencieux où elle est
+   le seul signal perceptible. Le son, lui, respecte le profil sonore du téléphone. Le
+   signal s'arrête de lui-même au bout de cinq minutes pour ne pas vider la batterie ;
+   l'écran, lui, reste affiché.
 3. Un plafond de 30 relances évite l'emballement si le téléphone reste inaccessible.
 
 Les trois valeurs sont réglables, et l'alarme se désactive si elle est jugée excessive.
@@ -51,9 +56,10 @@ Un créneau dont le libellé contient **« ou off »** — par exemple `EG ou Of
 journée où la présence n'est requise qu'en renfort de dernière minute. Il reste affiché au
 planning avec ses horaires, mais ne déclenche aucun rappel.
 
-Au-delà de cette règle, l'écran **Services concernés** liste les types rencontrés dans le
-flux et permet d'en mettre n'importe lequel en sourdine. La liste se construit toute seule
-à partir du planning : elle suit les libellés que l'établissement utilise réellement.
+Au-delà de cette règle, l'écran **Services concernés** présente les types rencontrés sous
+forme de puces à sélection multiple. La liste se construit toute seule à partir du planning
+et **mémorise tout ce qu'elle a déjà vu** : un service saisonnier ne disparaît pas des
+réglages parce qu'il est sorti de la fenêtre de trois semaines.
 
 Sur une journée mixte, seuls les créneaux encore actifs comptent : les bornes se
 recalculent dessus, si bien qu'un créneau muet ne laisse pas de rappel orphelin.
@@ -76,9 +82,14 @@ repli ajoute un rappel à 12h et 13h. Il est actif par défaut.
 
 ## Textes personnalisables
 
-Le titre et le texte de chaque type de rappel se modifient dans les réglages, présentés en
-carrousel — une carte par type. Deux marqueurs sont remplacés à l'affichage : `{heure}`
-par l'heure de l'action, `{poste}` par le nom du service.
+Le titre et le texte de chaque type de rappel se modifient dans les réglages, en sections
+dépliables. Deux marqueurs sont remplacés à l'affichage : `{heure}` par l'heure de
+l'action, `{poste}` par le nom du service.
+
+Les réglages sont eux-mêmes organisés en six sections repliées, chacune affichant son état
+dans son en-tête. Les valeurs en minutes se règlent par pas de un : un curseur occuperait
+toute la largeur et le doigt qui fait défiler la page en changerait la valeur au passage,
+ce qui, sur un écran consulté rarement, passerait inaperçu.
 
 ## Ce qui la fait tourner sans intervention
 

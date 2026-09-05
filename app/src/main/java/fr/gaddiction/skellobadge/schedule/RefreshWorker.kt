@@ -42,8 +42,19 @@ class RefreshWorker(
             val reminders = PlanningEngine.upcomingReminders(snapshot.days, now, SCHEDULE_HORIZON)
 
             AlarmScheduler(applicationContext).replaceAll(reminders, settings)
+
+            // Les types rencontrés s'accumulent d'une synchronisation à l'autre : la liste
+            // de sélection s'enrichit donc à mesure que de nouveaux services apparaissent
+            // au planning, sans jamais perdre ceux qui sortent de la fenêtre courante.
+            val discovered = snapshot.days
+                .filterIsInstance<fr.gaddiction.skellobadge.domain.DayPlan.Work>()
+                .flatMap { it.blocks }
+                .map { it.title }
+                .toSet()
+
             settingsRepository.update {
                 it.copy(
+                    knownShiftTypes = it.knownShiftTypes + discovered,
                     lastSyncEpochMillis = System.currentTimeMillis(),
                     lastSyncError = snapshot.error.orEmpty(),
                 )

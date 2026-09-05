@@ -5,6 +5,8 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -30,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import fr.gaddiction.skellobadge.schedule.AlarmScheduler
 import fr.gaddiction.skellobadge.schedule.ReminderIntents
+import fr.gaddiction.skellobadge.ui.rememberHaptics
 import fr.gaddiction.skellobadge.ui.theme.SkelloBadgeTheme
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -43,6 +46,9 @@ import java.util.Locale
  */
 class FullScreenAlarmActivity : ComponentActivity() {
 
+    private val signal by lazy { AlarmSignal(this) }
+    private val autoStop = Handler(Looper.getMainLooper())
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         showOverLockScreen()
@@ -52,6 +58,11 @@ class FullScreenAlarmActivity : ComponentActivity() {
             finish()
             return
         }
+
+        signal.start()
+        // Filet de sécurité : si le téléphone reste hors de portée, on cesse de sonner
+        // au bout de quelques minutes plutôt que de vider la batterie. L'écran, lui, reste.
+        autoStop.postDelayed({ signal.stop() }, SOUND_TIMEOUT_MILLIS)
 
         setContent {
             SkelloBadgeTheme {
@@ -71,7 +82,14 @@ class FullScreenAlarmActivity : ComponentActivity() {
         }
     }
 
+    override fun onDestroy() {
+        autoStop.removeCallbacksAndMessages(null)
+        signal.stop()
+        super.onDestroy()
+    }
+
     private fun dismiss(id: Int) {
+        signal.stop()
         NotificationManagerCompat.from(this).cancel(id)
         AlarmScheduler(this).cancelChain(id)
     }
@@ -92,6 +110,9 @@ class FullScreenAlarmActivity : ComponentActivity() {
 
     companion object {
         private const val SCHEME = "skellobadge"
+
+        /** Au-delà, on arrête le son et la vibration ; l'écran d'alarme reste affiché. */
+        private const val SOUND_TIMEOUT_MILLIS = 5 * 60 * 1000L
 
         /** Reprend les extras du rappel pour que l'écran sache quoi afficher et quoi ouvrir. */
         fun intent(context: Context, source: Intent): Intent = Intent(source).apply {
@@ -166,8 +187,10 @@ private fun AlarmScreen(
 
             Spacer(Modifier.height(48.dp))
 
+            val haptics = rememberHaptics()
+
             Button(
-                onClick = onOpenBadge,
+                onClick = { haptics.confirm(); onOpenBadge() },
                 modifier = Modifier.fillMaxWidth().height(72.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.error,
@@ -180,7 +203,7 @@ private fun AlarmScreen(
             Spacer(Modifier.height(16.dp))
 
             OutlinedButton(
-                onClick = onDone,
+                onClick = { haptics.confirm(); onDone() },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
             ) {
                 Text("J'ai déjà badgé", style = MaterialTheme.typography.titleMedium)
