@@ -56,6 +56,11 @@ data class WorkBlock(
     val end: ZonedDateTime,
     val title: String,
     val note: String? = null,
+    /**
+     * Faux pour un créneau de réserve ou un type mis en sourdine : il reste affiché avec
+     * ses horaires, mais ne produit aucun rappel.
+     */
+    val notifies: Boolean = true,
 ) {
     val duration: Duration get() = Duration.between(start, end)
 }
@@ -99,9 +104,9 @@ sealed interface DayPlan {
  */
 data class PlanningConfig(
     /** Combien de temps avant la prise de poste on prévient. */
-    val clockInLead: Duration = Duration.ofMinutes(5),
+    val clockInLead: Duration = Duration.ofMinutes(1),
     /** Combien de temps avant le retour de pause on prévient. */
-    val breakInLead: Duration = Duration.ofMinutes(5),
+    val breakInLead: Duration = Duration.ofMinutes(1),
     /** Les sorties (fin de poste, départ en pause) sont rappelées à l'heure pile par défaut. */
     val clockOutLead: Duration = Duration.ZERO,
     val breakOutLead: Duration = Duration.ZERO,
@@ -120,13 +125,30 @@ data class PlanningConfig(
     val offDayMinDuration: Duration = Duration.ofHours(23),
 
     /**
-     * Repli optionnel : rappeler une coupure méridienne même quand le planning n'en
-     * prévoit aucune. Désactivé par défaut — sur un planning Skello réel, la majorité
-     * des journées longues sont d'un seul tenant et ce repli produirait surtout du bruit.
+     * Rappeler une coupure méridienne même quand le planning n'en prévoit aucune.
+     * La plupart des journées longues étant d'un seul tenant au planning alors que la
+     * coupure est bien prise, ce repli est actif par défaut.
      */
-    val lunchFallbackEnabled: Boolean = false,
+    val lunchFallbackEnabled: Boolean = true,
     val lunchFallbackOut: LocalTime = LocalTime.of(12, 0),
     val lunchFallbackIn: LocalTime = LocalTime.of(13, 0),
     /** Durée minimale du bloc pour que le repli se déclenche. */
     val lunchFallbackMinBlock: Duration = Duration.ofHours(6),
-)
+
+    /**
+     * Fragments de libellé désignant un créneau de réserve. « EG ou Off » signifie que la
+     * présence n'est requise qu'en renfort de dernière minute : le créneau reste visible
+     * au planning, mais ne doit pas sonner.
+     */
+    val standbyPatterns: Set<String> = setOf("ou off"),
+
+    /** Types de service que l'utilisateur a explicitement mis en sourdine. */
+    val disabledTypes: Set<String> = emptySet(),
+) {
+    /** Un créneau produit-il des rappels ? */
+    fun notifiesFor(title: String): Boolean {
+        if (title in disabledTypes) return false
+        val normalized = title.lowercase()
+        return standbyPatterns.none { it.isNotBlank() && normalized.contains(it.lowercase()) }
+    }
+}

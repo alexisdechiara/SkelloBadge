@@ -10,16 +10,10 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
-import fr.gaddiction.skellobadge.MainActivity
 import fr.gaddiction.skellobadge.R
-import fr.gaddiction.skellobadge.domain.ReminderKind
 import fr.gaddiction.skellobadge.schedule.ReminderIntents
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 object ReminderNotification {
-
-    private val TIME = DateTimeFormatter.ofPattern("HH'h'mm", Locale.FRANCE)
 
     fun post(context: Context, payload: ReminderPayload, source: Intent) {
         if (!canPost(context)) return
@@ -41,17 +35,25 @@ object ReminderNotification {
     }
 
     private fun build(context: Context, payload: ReminderPayload, source: Intent) =
-        NotificationCompat.Builder(context, Notifications.channelFor(payload.kind))
+        NotificationCompat.Builder(context, channelFor(payload))
             .setSmallIcon(R.drawable.ic_stat_badge)
             .setContentTitle(titleFor(context, payload))
-            .setContentText(textFor(context, payload))
-            .setStyle(NotificationCompat.BigTextStyle().bigText(bigTextFor(context, payload)))
-            .setCategory(NotificationCompat.CATEGORY_REMINDER)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentText(payload.bodyText)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(bigTextFor(payload)))
+            .setCategory(
+                if (payload.shouldEscalate) {
+                    NotificationCompat.CATEGORY_ALARM
+                } else {
+                    NotificationCompat.CATEGORY_REMINDER
+                },
+            )
+            .setPriority(NotificationCompat.PRIORITY_MAX)
             .setAutoCancel(true)
             .setWhen(payload.actionAt.toInstant().toEpochMilli())
             .setShowWhen(true)
-            .setContentIntent(openTarget(context, payload))
+            .setContentIntent(
+                activity(context, payload.id, BadgeTargetIntent.resolve(context, payload)),
+            )
             .addAction(
                 0,
                 context.getString(R.string.action_badged),
@@ -62,80 +64,55 @@ object ReminderNotification {
                 context.getString(R.string.action_snooze),
                 action(context, payload, source, ReminderIntents.ACTION_SNOOZE),
             )
+            .apply {
+                if (payload.shouldEscalate) {
+                    // L'intention plein écran ouvre l'alarme par-dessus l'écran de
+                    // verrouillage. Si le système la refuse — permission non accordée sur
+                    // Android 14+ — la notification reste affichée en tête de liste.
+                    setFullScreenIntent(
+                        activity(
+                            context,
+                            payload.id + FULLSCREEN_REQUEST_OFFSET,
+                            FullScreenAlarmActivity.intent(context, source),
+                        ),
+                        true,
+                    )
+                    setOngoing(true)
+                }
+            }
             .build()
 
-    private fun titleFor(context: Context, payload: ReminderPayload): String {
-        val base = when (payload.kind) {
-            ReminderKind.CLOCK_IN -> R.string.notif_clock_in_title
-            ReminderKind.BREAK_OUT -> R.string.notif_break_out_title
-            ReminderKind.BREAK_IN -> R.string.notif_break_in_title
-            ReminderKind.SHIFT_CHANGE -> R.string.notif_shift_change_title
-            ReminderKind.CLOCK_OUT -> R.string.notif_clock_out_title
-        }.let(context::getString)
+    private fun channelFor(payload: ReminderPayload): String =
+        if (payload.shouldEscalate) Notifications.CHANNEL_ALARM else Notifications.channelFor(payload.kind)
 
-        return if (payload.isNag) {
-            context.getString(R.string.notif_nag_prefix) + " " + base
-        } else {
-            base
-        }
-    }
+    private fun titleFor(context: Context, payload: ReminderPayload): String = when {
+        payload.shouldEscalate -> context.getString(
+            R.string.notif_late_prefix,
+            payload.ignoredForMinutes,
+        ) + " " + payload.titleText
 
-    private fun textFor(context: Context, payload: ReminderPayload): String {
-        val time = TIME.format(payload.actionAt)
-        return when (payload.kind) {
-            ReminderKind.CLOCK_IN ->
-                context.getString(R.string.notif_clock_in_text, time, payload.title)
+        payload.attempt > 0 -> context.getString(R.string.notif_nag_prefix) + " " + payload.titleText
 
-            ReminderKind.BREAK_OUT ->
-                context.getString(R.string.notif_break_out_text, time)
-
-            ReminderKind.BREAK_IN ->
-                context.getString(R.string.notif_break_in_text, time, payload.title)
-
-            ReminderKind.SHIFT_CHANGE ->
-                context.getString(R.string.notif_shift_change_text, time, payload.title)
-
-            ReminderKind.CLOCK_OUT ->
-                context.getString(R.string.notif_clock_out_text, time)
-        }
+        else -> payload.titleText
     }
 
     /**
-     * La note du planning ne tient pas sur une ligne mais porte souvent l'information
-     * la plus utile (heure de rendez-vous, personne à confirmer) : elle est réservée au
+     * La note du planning ne tient pas sur une ligne mais porte souvent l'information la
+     * plus utile (heure de rendez-vous, personne à confirmer) : elle est réservée au
      * texte déplié.
      */
-    private fun bigTextFor(context: Context, payload: ReminderPayload): String {
-        val main = textFor(context, payload)
-        val note = payload.note?.takeIf(String::isNotBlank) ?: return main
-        return main + "\n\n" + note
+    private fun bigTextFor(payload: ReminderPayload): String {
+        val note = payload.note?.takeIf(String::isNotBlank) ?: return payload.bodyText
+        return payload.bodyText + "\n\n" + note
     }
 
-    /**
-     * Ouvre directement la badgeuse. La cible ayant été résolue au moment de la
-     * planification, aucun détour par notre propre application n'est nécessaire.
-     */
-    private fun openTarget(context: Context, payload: ReminderPayload): PendingIntent {
-        val intent = targetIntent(context, payload)
-            ?: Intent(context, MainActivity::class.java)
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        return PendingIntent.getActivity(
+    private fun activity(context: Context, requestCode: Int, intent: Intent): PendingIntent =
+        PendingIntent.getActivity(
             context,
-            payload.id,
+            requestCode,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-    }
-
-    private fun targetIntent(context: Context, payload: ReminderPayload): Intent? {
-        payload.targetPackage?.takeIf(String::isNotBlank)?.let { pkg ->
-            context.packageManager.getLaunchIntentForPackage(pkg)?.let { return it }
-        }
-        payload.targetUrl?.takeIf(String::isNotBlank)?.let { url ->
-            return Intent(Intent.ACTION_VIEW, Uri.parse(url))
-        }
-        return null
-    }
 
     private fun action(
         context: Context,
@@ -157,4 +134,7 @@ object ReminderNotification {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
     }
+
+    /** Décalage pour ne pas confondre le PendingIntent plein écran avec celui du clic. */
+    private const val FULLSCREEN_REQUEST_OFFSET = 1_000_000
 }

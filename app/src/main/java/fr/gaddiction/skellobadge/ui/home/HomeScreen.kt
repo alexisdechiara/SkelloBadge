@@ -215,6 +215,20 @@ private fun DayCard(day: DayPlan) {
                             TIME.format(block.start) + " – " + TIME.format(block.end) +
                                 " · " + block.title,
                             style = MaterialTheme.typography.bodyMedium,
+                            color = if (block.notifies) {
+                                MaterialTheme.colorScheme.onSurface
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        )
+                    }
+
+                    if (day.reminders.isEmpty()) {
+                        Text(
+                            "Journée de réserve · aucun rappel",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 6.dp),
                         )
                     }
                     // Une journée coupée porte quatre rappels : sur un écran étroit ils

@@ -10,20 +10,15 @@
     <string name="channel_clock_out_desc">Rappel de badgeage en fin de service</string>
     <string name="channel_shift_change_name">Changement de poste</string>
     <string name="channel_shift_change_desc">Bascule entre deux services enchaînés</string>
+    <string name="channel_alarm_name">Badgeage en retard</string>
+    <string name="channel_alarm_desc">Alarme plein écran quand un rappel reste ignoré</string>
     <string name="channel_status_name">État de la synchronisation</string>
     <string name="channel_status_desc">Signale un planning qui ne peut plus être récupéré</string>
 
-    <string name="notif_clock_in_title">Badge ton entrée</string>
-    <string name="notif_clock_in_text">Prise de poste à %1$s · %2$s</string>
-    <string name="notif_break_out_title">Badge ta sortie</string>
-    <string name="notif_break_out_text">Coupure à partir de %1$s</string>
-    <string name="notif_break_in_title">Badge ton retour</string>
-    <string name="notif_break_in_text">Reprise à %1$s · %2$s</string>
-    <string name="notif_shift_change_title">Badge la bascule</string>
-    <string name="notif_shift_change_text">À %1$s : %2$s</string>
-    <string name="notif_clock_out_title">Badge ta sortie</string>
-    <string name="notif_clock_out_text">Fin de service à %1$s</string>
+    <!-- Le texte des rappels est modifiable dans les réglages ; seuls les préfixes
+         d’escalade restent figés, car ils décrivent l’état et non le rappel. -->
     <string name="notif_nag_prefix">Toujours pas badgé ?</string>
+    <string name="notif_late_prefix">Retard de %1$d min ·</string>
 
     <string name="notif_sync_error_title">Planning non récupéré</string>
     <string name="notif_sync_error_text">Les rappels reposent sur la dernière version connue.</string>

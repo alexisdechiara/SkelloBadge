@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.ZoneId
@@ -37,6 +38,22 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _loading = MutableStateFlow(false)
     val loading: StateFlow<Boolean> = _loading.asStateFlow()
+
+    /**
+     * Les types de service rencontrés dans le planning, pour que l'utilisateur puisse en
+     * mettre certains en sourdine. La liste est déduite du flux plutôt que saisie à la
+     * main : elle suit donc automatiquement les libellés que l'établissement utilise.
+     */
+    val shiftTypes: StateFlow<List<String>> = planning
+        .map { snapshot ->
+            snapshot?.days.orEmpty()
+                .filterIsInstance<DayPlan.Work>()
+                .flatMap { it.blocks }
+                .map { it.title }
+                .distinct()
+                .sorted()
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /** Résultat de la vérification du lien pendant la configuration initiale. */
     sealed interface LinkCheck {
@@ -59,6 +76,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun sendTestReminder() {
         viewModelScope.launch {
             AlarmScheduler(getApplication()).scheduleTest(settingsRepository.current())
+        }
+    }
+
+    /** Même chose, mais en déclenchant directement l'escalade plein écran. */
+    fun sendFullScreenTest() {
+        viewModelScope.launch {
+            AlarmScheduler(getApplication()).scheduleFullScreenTest(settingsRepository.current())
         }
     }
 

@@ -108,4 +108,6 @@ fun AppSettings.toPlanningConfig(): PlanningConfig = PlanningConfig(
     breakInLead = Duration.ofMinutes(breakInLeadMinutes.toLong()),
     shiftChangeMaxGap = Duration.ofMinutes(shiftChangeMaxGapMinutes.toLong()),
     lunchFallbackEnabled = lunchFallbackEnabled,
+    standbyPatterns = standbyPatterns,
+    disabledTypes = disabledShiftTypes,
 )

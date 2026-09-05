@@ -3,6 +3,8 @@ package fr.gaddiction.skellobadge.notify
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.media.AudioAttributes
+import android.media.RingtoneManager
 import androidx.core.content.getSystemService
 import fr.gaddiction.skellobadge.R
 import fr.gaddiction.skellobadge.domain.ReminderKind
@@ -19,6 +21,7 @@ object Notifications {
     const val CHANNEL_BREAK = "break"
     const val CHANNEL_CLOCK_OUT = "clock_out"
     const val CHANNEL_SHIFT_CHANGE = "shift_change"
+    const val CHANNEL_ALARM = "alarm"
     const val CHANNEL_STATUS = "status"
 
     const val NOTIFICATION_ID_SYNC_ERROR = 1
@@ -58,6 +61,7 @@ object Notifications {
                     R.string.channel_shift_change_name,
                     R.string.channel_shift_change_desc,
                 ),
+                alarmChannel(context),
                 channel(
                     context,
                     CHANNEL_STATUS,
@@ -68,6 +72,30 @@ object Notifications {
             ),
         )
     }
+
+    /**
+     * Canal de l'escalade. Il utilise le son et le flux audio des alarmes plutôt que ceux
+     * des notifications : c'est ce qui le rend audible quand le téléphone est en sourdine,
+     * et ce qui distingue un badgeage en retard d'une notification ordinaire.
+     */
+    private fun alarmChannel(context: Context): NotificationChannel =
+        NotificationChannel(
+            CHANNEL_ALARM,
+            context.getString(R.string.channel_alarm_name),
+            NotificationManager.IMPORTANCE_HIGH,
+        ).apply {
+            description = context.getString(R.string.channel_alarm_desc)
+            enableVibration(true)
+            vibrationPattern = longArrayOf(0, 500, 300, 500, 300, 500)
+            setShowBadge(true)
+            setSound(
+                RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM),
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build(),
+            )
+        }
 
     private fun channel(
         context: Context,

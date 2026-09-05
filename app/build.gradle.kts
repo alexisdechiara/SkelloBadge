@@ -1,9 +1,27 @@
+import java.util.Properties
+
 plugins {
     // Depuis AGP 9, le support Kotlin est intégré : le plugin org.jetbrains.kotlin.android
     // ne doit plus être appliqué. Seul le plugin du compilateur Compose reste nécessaire.
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
 }
+
+/**
+ * Clé de signature de distribution.
+ *
+ * Le fichier keystore.properties et le magasin de clés lui-même restent hors du dépôt.
+ * En leur absence — sur un poste qui vient de cloner, ou dans la CI — la variante release
+ * retombe sur la clé de debug : le build ne casse pas, mais l'APK produit ne peut pas
+ * mettre à jour une installation signée avec la vraie clé.
+ */
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties().apply {
+    if (keystorePropertiesFile.exists()) {
+        keystorePropertiesFile.inputStream().use(::load)
+    }
+}
+val hasReleaseKey = keystoreProperties.getProperty("storeFile") != null
 
 android {
     namespace = "fr.gaddiction.skellobadge"
@@ -22,8 +40,22 @@ android {
         versionName = "1.0"
     }
 
+    signingConfigs {
+        if (hasReleaseKey) {
+            create("distribution") {
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = signingConfigs.findByName("distribution")
+                ?: signingConfigs.getByName("debug")
+
             // Volontairement désactivé : l'APK est distribué en direct, sa taille n'est
             // pas un enjeu, et on évite toute règle de conservation à maintenir.
             isMinifyEnabled = false

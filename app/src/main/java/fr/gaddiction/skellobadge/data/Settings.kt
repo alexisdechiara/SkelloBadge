@@ -1,5 +1,7 @@
 package fr.gaddiction.skellobadge.data
 
+import fr.gaddiction.skellobadge.domain.ReminderKind
+
 /** D'où vient le planning. */
 enum class PlanningSource {
     /** Flux ICS Skello : aucune permission calendrier requise, mise en cache hors ligne. */
@@ -18,6 +20,44 @@ enum class BadgeTarget {
     URL,
 }
 
+/**
+ * Texte d'un rappel. Le corps accepte deux marqueurs, remplacés au moment de l'affichage :
+ * `{heure}` par l'heure de l'action et `{poste}` par le libellé du service.
+ */
+data class Wording(val title: String, val body: String) {
+    fun format(time: String, shift: String): String =
+        body.replace(PLACEHOLDER_TIME, time).replace(PLACEHOLDER_SHIFT, shift)
+
+    companion object {
+        const val PLACEHOLDER_TIME = "{heure}"
+        const val PLACEHOLDER_SHIFT = "{poste}"
+
+        /** Formulations par défaut, entièrement remplaçables depuis les réglages. */
+        val DEFAULTS: Map<ReminderKind, Wording> = mapOf(
+            ReminderKind.CLOCK_IN to Wording(
+                "Badge ton entrée",
+                "Prise de poste à {heure} · {poste}",
+            ),
+            ReminderKind.BREAK_OUT to Wording(
+                "Badge ta sortie",
+                "Coupure à partir de {heure}",
+            ),
+            ReminderKind.BREAK_IN to Wording(
+                "Badge ton retour",
+                "Reprise à {heure} · {poste}",
+            ),
+            ReminderKind.SHIFT_CHANGE to Wording(
+                "Badge la bascule",
+                "À {heure} : {poste}",
+            ),
+            ReminderKind.CLOCK_OUT to Wording(
+                "Badge ta sortie",
+                "Fin de service à {heure}",
+            ),
+        )
+    }
+}
+
 data class AppSettings(
     /** Passe à vrai une fois la configuration initiale terminée. On ne redemande plus rien ensuite. */
     val configured: Boolean = false,
@@ -27,31 +67,63 @@ data class AppSettings(
     val calendarIds: Set<Long> = emptySet(),
 
     val targetKind: BadgeTarget = BadgeTarget.APP,
-    val targetPackage: String = "",
-    val targetLabel: String = "",
+    /** Pré-réglé sur la badgeuse Skello ; reste modifiable dans la liste des applications. */
+    val targetPackage: String = SKELLO_PUNCH_CLOCK_PACKAGE,
+    val targetLabel: String = SKELLO_PUNCH_CLOCK_LABEL,
     val targetUrl: String = "",
 
-    val clockInLeadMinutes: Int = 5,
-    val breakInLeadMinutes: Int = 5,
+    /**
+     * Une minute d'avance : le directeur étant pointilleux sur l'horaire, le rappel doit
+     * tomber juste avant l'heure exacte, pas cinq minutes plus tôt où il serait oublié.
+     */
+    val clockInLeadMinutes: Int = 1,
+    val breakInLeadMinutes: Int = 1,
     val shiftChangeMaxGapMinutes: Int = 5,
 
-    /** Relance si la notification est restée sans réponse. 0 pour désactiver. */
-    val nagAfterMinutes: Int = 5,
+    /** Intervalle entre deux relances tant que le badgeage n'est pas confirmé. */
+    val nagIntervalMinutes: Int = 1,
+    /** Garde-fou : au-delà, on cesse de relancer même sans réponse. */
+    val nagMaxCount: Int = 30,
+
+    /** Alarme plein écran, façon réveil, si le rappel reste ignoré trop longtemps. */
+    val fullScreenAlarmEnabled: Boolean = true,
+    val fullScreenAlarmAfterMinutes: Int = 5,
+
+    /** Rappel de coupure sur les journées longues dont le planning ne prévoit rien. */
+    val lunchFallbackEnabled: Boolean = true,
 
     /**
-     * Rappel de coupure méridienne sur les journées d'un seul tenant. Désactivé par
-     * défaut : sur un planning Skello réel la plupart des journées longues sont
-     * continues, et ce repli produirait surtout du bruit.
+     * Un créneau dont le libellé contient l'un de ces fragments est une journée de
+     * réserve : il reste affiché avec ses horaires, mais ne déclenche aucun rappel.
+     * « EG ou Off » signifie que la présence n'est requise qu'en renfort de dernière minute.
      */
-    val lunchFallbackEnabled: Boolean = false,
+    val standbyPatterns: Set<String> = setOf("ou off"),
+
+    /** Types de service explicitement mis en sourdine par l'utilisateur. */
+    val disabledShiftTypes: Set<String> = emptySet(),
+
+    /** Formulation de chaque type de rappel. Toute entrée absente retombe sur le défaut. */
+    val wording: Map<ReminderKind, Wording> = Wording.DEFAULTS,
 
     val lastSyncEpochMillis: Long = 0L,
     val lastSyncError: String = "",
 ) {
+    fun wordingFor(kind: ReminderKind): Wording =
+        wording[kind] ?: Wording.DEFAULTS.getValue(kind)
+
     /** Vrai si l'application dispose de tout ce qu'il lui faut pour travailler seule. */
     val isUsable: Boolean
         get() = configured && when (source) {
             PlanningSource.ICS -> icsUrl.isNotBlank()
             PlanningSource.DEVICE_CALENDAR -> calendarIds.isNotEmpty()
         }
+
+    companion object {
+        /** « Skello : la badgeuse » sur le Play Store. */
+        const val SKELLO_PUNCH_CLOCK_PACKAGE = "com.skellopunchclock"
+        const val SKELLO_PUNCH_CLOCK_LABEL = "Skello : la badgeuse"
+
+        /** L'application des équipes, au cas où ce serait elle la cible voulue. */
+        const val SKELLO_TEAM_PACKAGE = "app.skello.skello"
+    }
 }

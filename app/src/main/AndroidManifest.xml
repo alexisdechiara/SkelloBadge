@@ -25,6 +25,14 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <!--
+      Alarme plein écran par-dessus l'écran de verrouillage quand un badgeage reste ignoré.
+      Accordée d'office jusqu'à Android 13 ; à partir d'Android 14 elle est réservée aux
+      applications d'appel et de réveil, et doit être accordée explicitement — ce que
+      l'installation guidée propose de faire.
+    -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+
+    <!--
       Permet de lister les applications lançables pour que l'utilisateur désigne
       lui-même la badgeuse, sans avoir à deviner un nom de paquet et sans recourir
       à QUERY_ALL_PACKAGES.
@@ -63,6 +71,20 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+          Alarme plein écran. excludeFromRecents et noHistory évitent qu'elle traîne dans
+          les applications récentes une fois le badgeage confirmé.
+        -->
+        <activity
+            android:name=".notify.FullScreenAlarmActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:launchMode="singleTask"
+            android:showOnLockScreen="true"
+            android:taskAffinity=".alarm"
+            android:theme="@style/Theme.SkelloBadge" />
 
         <!-- Déclenché par AlarmManager via un PendingIntent de l'application elle-même. -->
         <receiver

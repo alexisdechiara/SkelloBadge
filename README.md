@@ -2,7 +2,7 @@
 
 Rappels de badgeage Android, calés sur un planning Skello. On la configure une fois,
 puis on l'oublie : elle lit le planning toute seule, pose ses alarmes, et la
-notification ouvre directement la badgeuse.
+notification ouvre directement **Skello : la badgeuse** (`com.skellopunchclock`).
 
 ## Ce qu'elle fait
 
@@ -10,15 +10,27 @@ notification ouvre directement la badgeuse.
 
 | Moment | Rappel |
 | --- | --- |
-| Prise de poste | 5 min avant le début du premier service du jour |
+| Prise de poste | 1 min avant le début du premier service du jour |
 | Départ en coupure | à l'heure de fin du service, quand une vraie coupure suit |
-| Retour de coupure | 5 min avant la reprise |
+| Retour de coupure | 1 min avant la reprise |
 | Changement de poste | à l'instant de la bascule, quand deux services s'enchaînent sans écart |
 | Fin de poste | à l'heure de fin du dernier service |
 
-Toucher la notification ouvre la badgeuse. Deux boutons : **J'ai badgé**, qui coupe la
-relance, et **Dans 5 min**, qui reporte. Sans réponse, un second rappel arrive au bout de
-cinq minutes — c'est ce qui rattrape les oublis réels.
+Toucher la notification ouvre la badgeuse. Deux boutons : **J'ai badgé**, qui coupe toute
+la chaîne de relances, et **Dans 5 min**, qui reporte.
+
+## L'insistance, par paliers
+
+Le timing étant contrôlé de près, un rappel ignoré ne s'efface pas :
+
+1. **Relance chaque minute** tant que le badgeage n'est pas confirmé.
+2. **Au bout de 5 minutes**, l'application passe à l'**alarme plein écran** : elle rallume
+   l'écran, s'affiche par-dessus le verrouillage avec le son et le flux audio des alarmes,
+   et propose un bouton unique vers la badgeuse. Une notification se balaie sans y penser ;
+   pas cet écran.
+3. Un plafond de 30 relances évite l'emballement si le téléphone reste inaccessible.
+
+Les trois valeurs sont réglables, et l'alarme se désactive si elle est jugée excessive.
 
 ## Comment les jours off sont reconnus
 
@@ -30,10 +42,26 @@ Conséquence utile : les congés, arrêts maladie et jours fériés à venir son
 automatiquement, sans liste de mots-clés à maintenir. Le seuil de 23 h — et non 24 —
 absorbe les journées de changement d'heure, qui durent 23 h ou 25 h.
 
+Le fuseau retenu est celui porté par l'événement, c'est-à-dire celui de l'établissement,
+jamais celui du téléphone : minuit reste minuit même en déplacement.
+
+## Les journées de réserve
+
+Un créneau dont le libellé contient **« ou off »** — par exemple `EG ou Off` — désigne une
+journée où la présence n'est requise qu'en renfort de dernière minute. Il reste affiché au
+planning avec ses horaires, mais ne déclenche aucun rappel.
+
+Au-delà de cette règle, l'écran **Services concernés** liste les types rencontrés dans le
+flux et permet d'en mettre n'importe lequel en sourdine. La liste se construit toute seule
+à partir du planning : elle suit les libellés que l'établissement utilise réellement.
+
+Sur une journée mixte, seuls les créneaux encore actifs comptent : les bornes se
+recalculent dessus, si bien qu'un créneau muet ne laisse pas de rappel orphelin.
+
 ## Comment la coupure est déduite
 
-La coupure n'est jamais supposée : elle est lue dans le planning, comme l'écart entre deux
-services d'une même journée.
+La coupure est d'abord lue dans le planning, comme l'écart entre deux services d'une même
+journée.
 
 - Écart supérieur à 5 minutes → vraie coupure : deux rappels, sortie puis retour.
 - Écart inférieur ou nul → enchaînement de postes : **un seul** rappel de bascule, parce
@@ -43,9 +71,14 @@ services d'une même journée.
 Les services ne sont jamais fusionnés : `10h00→19h00` suivi de `19h00→21h00` reste bien
 deux services, avec un badgeage à 19h00.
 
-Un repli facultatif ajoute une coupure à 12h/13h sur les journées longues qui n'en
-prévoient aucune. Il est **désactivé par défaut** : sur un planning réel, la plupart des
-journées longues sont d'un seul tenant, et l'activer produirait surtout du bruit.
+Sur les journées longues d'un seul tenant, dont le planning ne prévoit aucune coupure, un
+repli ajoute un rappel à 12h et 13h. Il est actif par défaut.
+
+## Textes personnalisables
+
+Le titre et le texte de chaque type de rappel se modifient dans les réglages, présentés en
+carrousel — une carte par type. Deux marqueurs sont remplacés à l'affichage : `{heure}`
+par l'heure de l'action, `{poste}` par le nom du service.
 
 ## Ce qui la fait tourner sans intervention
 
@@ -65,11 +98,21 @@ sur le disque : sans réseau, les rappels continuent de tomber.
    lien** récupère et interprète le flux sur-le-champ, et annonce combien de créneaux et
    de jours non travaillés il a reconnus : une adresse erronée ne peut pas passer
    inaperçue, alors qu'elle se traduirait autrement par une simple absence de rappels.
-2. **Badgeuse** — soit une application installée, choisie dans la liste, soit une adresse
-   web. Aucun nom de paquet n'est codé en dur.
-3. **Autorisations** — notifications, et exemption d'économie de batterie.
+2. **Badgeuse** — pré-réglée sur `com.skellopunchclock`, modifiable dans la liste des
+   applications installées ou remplaçable par une adresse web.
+3. **Autorisations** — notifications, exemption d'économie de batterie, et sur Android 14+
+   l'autorisation d'affichage plein écran.
 
 Ensuite, plus rien à faire.
+
+## Vérifier que ça marche sur un téléphone donné
+
+Les réglages contiennent deux boutons de contrôle, à utiliser une fois sur chaque
+téléphone avant d'en dépendre :
+
+- **Envoyer un rappel de test dans 10 s** — emprunte le chemin complet d'un vrai rappel.
+- **Tester l'alarme plein écran** — déclenche directement l'escalade. Verrouiller l'écran
+  pendant les dix secondes qui suivent : l'alarme doit s'afficher par-dessus.
 
 ## Compiler
 
@@ -79,13 +122,24 @@ La chaîne d'outils est installée hors du dépôt, dans `D:\Users\Alexis\Progra
 JAVA_HOME=D:/Users/Alexis/Programmation/_android/jdk ./gradlew assembleDebug
 ```
 
-Le SDK est référencé par `local.properties`, qui n'est pas versionné. L'APK sort dans
-`app/build/outputs/apk/`.
-
-Pour lancer les tests du moteur de planification :
+Le SDK est référencé par `local.properties`, non versionné. Pour l'APK distribuable :
 
 ```bash
-JAVA_HOME=D:/Users/Alexis/Programmation/_android/jdk ./gradlew test
+JAVA_HOME=D:/Users/Alexis/Programmation/_android/jdk ./gradlew assembleRelease
+```
+
+La signature de distribution est décrite par `keystore.properties`, lui aussi hors dépôt.
+**Le magasin de clés est irremplaçable** : le perdre interdit toute mise à jour d'une
+installation existante, qui devrait alors être désinstallée puis réinstallée. À sauvegarder
+ailleurs que sur cette machine.
+
+En l'absence de ces deux fichiers — sur un poste qui vient de cloner, ou dans la CI — la
+variante release retombe sur la clé de debug et le build fonctionne quand même.
+
+Tests du moteur de planification :
+
+```bash
+JAVA_HOME=D:/Users/Alexis/Programmation/_android/jdk ./gradlew testDebugUnitTest
 ```
 
 ## Limites connues
@@ -94,13 +148,10 @@ JAVA_HOME=D:/Users/Alexis/Programmation/_android/jdk ./gradlew test
   apparaissait, l'événement serait ignoré et le compte remonté plutôt que passé sous
   silence.
 - **Android uniquement.** Sur iPhone, une distribution hors store impose TestFlight
-  (99 €/an, builds expirant tous les 90 jours), ce qui est incompatible avec une
-  application qu'on installe et qu'on oublie.
+  (99 €/an, builds expirant tous les 90 jours), incompatible avec une application qu'on
+  installe et qu'on oublie.
 - **Économie d'énergie des constructeurs.** Xiaomi, Samsung, Oppo et consorts suspendent
-  parfois les alarmes en veille prolongée malgré l'exemption. Les réglages contiennent un
-  bouton **Envoyer un rappel de test dans 10 s**, qui emprunte exactement le même chemin
-  qu'un vrai rappel : c'est le moyen de le vérifier sur chaque téléphone avant d'en
-  dépendre.
+  parfois les alarmes en veille prolongée malgré l'exemption. D'où les deux boutons de test.
 - **Material 3 Expressive en version alpha.** L'API n'est accessible qu'à partir de
   `material3` 1.5.0-alpha : en 1.4.0 stable, elle est intégralement `internal`, y compris
-  l'annotation qui l'active. C'est le prix à payer pour le langage visuel demandé.
+  l'annotation qui l'active.

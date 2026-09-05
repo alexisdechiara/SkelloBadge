@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import fr.gaddiction.skellobadge.domain.ReminderKind
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -40,10 +41,21 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.CLOCK_IN_LEAD] = updated.clockInLeadMinutes
             prefs[Keys.BREAK_IN_LEAD] = updated.breakInLeadMinutes
             prefs[Keys.SHIFT_CHANGE_GAP] = updated.shiftChangeMaxGapMinutes
-            prefs[Keys.NAG_AFTER] = updated.nagAfterMinutes
+            prefs[Keys.NAG_INTERVAL] = updated.nagIntervalMinutes
+            prefs[Keys.NAG_MAX] = updated.nagMaxCount
+            prefs[Keys.FULLSCREEN_ENABLED] = updated.fullScreenAlarmEnabled
+            prefs[Keys.FULLSCREEN_AFTER] = updated.fullScreenAlarmAfterMinutes
             prefs[Keys.LUNCH_FALLBACK] = updated.lunchFallbackEnabled
+            prefs[Keys.STANDBY_PATTERNS] = updated.standbyPatterns
+            prefs[Keys.DISABLED_TYPES] = updated.disabledShiftTypes
             prefs[Keys.LAST_SYNC] = updated.lastSyncEpochMillis
             prefs[Keys.LAST_SYNC_ERROR] = updated.lastSyncError
+
+            ReminderKind.entries.forEach { kind ->
+                val wording = updated.wordingFor(kind)
+                prefs[wordingTitleKey(kind)] = wording.title
+                prefs[wordingBodyKey(kind)] = wording.body
+            }
         }
     }
 
@@ -67,13 +79,34 @@ class SettingsRepository(private val context: Context) {
             targetUrl = prefs[Keys.TARGET_URL] ?: defaults.targetUrl,
             clockInLeadMinutes = prefs[Keys.CLOCK_IN_LEAD] ?: defaults.clockInLeadMinutes,
             breakInLeadMinutes = prefs[Keys.BREAK_IN_LEAD] ?: defaults.breakInLeadMinutes,
-            shiftChangeMaxGapMinutes = prefs[Keys.SHIFT_CHANGE_GAP] ?: defaults.shiftChangeMaxGapMinutes,
-            nagAfterMinutes = prefs[Keys.NAG_AFTER] ?: defaults.nagAfterMinutes,
+            shiftChangeMaxGapMinutes = prefs[Keys.SHIFT_CHANGE_GAP]
+                ?: defaults.shiftChangeMaxGapMinutes,
+            nagIntervalMinutes = prefs[Keys.NAG_INTERVAL] ?: defaults.nagIntervalMinutes,
+            nagMaxCount = prefs[Keys.NAG_MAX] ?: defaults.nagMaxCount,
+            fullScreenAlarmEnabled = prefs[Keys.FULLSCREEN_ENABLED]
+                ?: defaults.fullScreenAlarmEnabled,
+            fullScreenAlarmAfterMinutes = prefs[Keys.FULLSCREEN_AFTER]
+                ?: defaults.fullScreenAlarmAfterMinutes,
             lunchFallbackEnabled = prefs[Keys.LUNCH_FALLBACK] ?: defaults.lunchFallbackEnabled,
+            standbyPatterns = prefs[Keys.STANDBY_PATTERNS] ?: defaults.standbyPatterns,
+            disabledShiftTypes = prefs[Keys.DISABLED_TYPES] ?: defaults.disabledShiftTypes,
+            wording = ReminderKind.entries.associateWith { kind ->
+                val fallback = Wording.DEFAULTS.getValue(kind)
+                Wording(
+                    title = prefs[wordingTitleKey(kind)] ?: fallback.title,
+                    body = prefs[wordingBodyKey(kind)] ?: fallback.body,
+                )
+            },
             lastSyncEpochMillis = prefs[Keys.LAST_SYNC] ?: defaults.lastSyncEpochMillis,
             lastSyncError = prefs[Keys.LAST_SYNC_ERROR] ?: defaults.lastSyncError,
         )
     }
+
+    private fun wordingTitleKey(kind: ReminderKind) =
+        stringPreferencesKey("wording_title_" + kind.name)
+
+    private fun wordingBodyKey(kind: ReminderKind) =
+        stringPreferencesKey("wording_body_" + kind.name)
 
     private object Keys {
         val CONFIGURED = booleanPreferencesKey("configured")
@@ -87,8 +120,13 @@ class SettingsRepository(private val context: Context) {
         val CLOCK_IN_LEAD = intPreferencesKey("clock_in_lead")
         val BREAK_IN_LEAD = intPreferencesKey("break_in_lead")
         val SHIFT_CHANGE_GAP = intPreferencesKey("shift_change_gap")
-        val NAG_AFTER = intPreferencesKey("nag_after")
+        val NAG_INTERVAL = intPreferencesKey("nag_interval")
+        val NAG_MAX = intPreferencesKey("nag_max")
+        val FULLSCREEN_ENABLED = booleanPreferencesKey("fullscreen_enabled")
+        val FULLSCREEN_AFTER = intPreferencesKey("fullscreen_after")
         val LUNCH_FALLBACK = booleanPreferencesKey("lunch_fallback")
+        val STANDBY_PATTERNS = stringSetPreferencesKey("standby_patterns")
+        val DISABLED_TYPES = stringSetPreferencesKey("disabled_types")
         val LAST_SYNC = longPreferencesKey("last_sync")
         val LAST_SYNC_ERROR = stringPreferencesKey("last_sync_error")
     }

@@ -7,7 +7,13 @@ import android.util.Log
 import fr.gaddiction.skellobadge.notify.ReminderNotification
 import fr.gaddiction.skellobadge.notify.ReminderPayload
 
-/** Déclenché par AlarmManager à l'heure d'un rappel. */
+/**
+ * Déclenché par AlarmManager à l'heure d'un rappel, puis à chaque relance.
+ *
+ * Chaque déclenchement programme lui-même le suivant : la chaîne ne s'arrête qu'au
+ * badgeage confirmé, ou au plafond de relances. C'est ce qui permet de tenir un rythme
+ * d'une relance par minute sans avoir à poser trente alarmes d'avance.
+ */
 class ReminderReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -19,10 +25,19 @@ class ReminderReceiver : BroadcastReceiver() {
         }
 
         ReminderNotification.post(context, payload, intent)
+        Log.i(
+            TAG,
+            "Rappel " + payload.id + " tentative " + payload.attempt +
+                (if (payload.shouldEscalate) " (plein ecran)" else ""),
+        )
 
-        // Une seule relance, et seulement si la notification d'origine n'en était pas une.
-        if (!payload.isNag && payload.nagMinutes > 0) {
-            AlarmScheduler(context).scheduleDelayedFire(intent, payload.id, payload.nagMinutes)
+        if (payload.hasFollowUp) {
+            AlarmScheduler(context).scheduleFollowUp(
+                source = intent,
+                id = payload.id,
+                nextAttempt = payload.attempt + 1,
+                delayMinutes = payload.nagIntervalMinutes,
+            )
         }
     }
 

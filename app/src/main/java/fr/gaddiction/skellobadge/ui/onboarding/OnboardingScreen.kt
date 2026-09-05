@@ -1,12 +1,14 @@
 package fr.gaddiction.skellobadge.ui.onboarding
 
 import android.Manifest
+import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
+import androidx.annotation.RequiresApi
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -332,7 +334,7 @@ private fun PermissionsStep() {
         ActivityResultContracts.RequestPermission(),
     ) { }
 
-    Text("Deux autorisations, une fois", style = MaterialTheme.typography.headlineSmall)
+    Text("Trois autorisations, une fois", style = MaterialTheme.typography.headlineSmall)
 
     Text(
         "Les rappels doivent pouvoir sonner à l'heure exacte, y compris quand le " +
@@ -361,6 +363,30 @@ private fun PermissionsStep() {
             } else {
                 "Exempter de l'économie de batterie"
             },
+        )
+    }
+
+    // À partir d'Android 14, l'alarme plein écran est réservée aux applications d'appel
+    // et de réveil : sans cette autorisation, l'escalade retombe en simple notification.
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+        val allowed = context.canUseFullScreenIntent()
+        OutlinedButton(
+            onClick = { context.requestFullScreenIntent() },
+            enabled = !allowed,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(
+                if (allowed) {
+                    "Alarme plein écran déjà autorisée"
+                } else {
+                    "Autoriser l'alarme plein écran"
+                },
+            )
+        }
+        Text(
+            "Sans elle, un badgeage oublié produira une notification insistante, mais pas " +
+                "l'écran d'alarme par-dessus l'écran verrouillé.",
+            style = MaterialTheme.typography.bodySmall,
         )
     }
 }
@@ -396,6 +422,20 @@ private fun Context.requestIgnoreBatteryOptimizations() {
     runCatching {
         startActivity(
             Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                .setData(Uri.parse("package:" + packageName)),
+        )
+    }
+}
+
+@RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+private fun Context.canUseFullScreenIntent(): Boolean =
+    getSystemService(NotificationManager::class.java)?.canUseFullScreenIntent() ?: false
+
+@RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+private fun Context.requestFullScreenIntent() {
+    runCatching {
+        startActivity(
+            Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT)
                 .setData(Uri.parse("package:" + packageName)),
         )
     }

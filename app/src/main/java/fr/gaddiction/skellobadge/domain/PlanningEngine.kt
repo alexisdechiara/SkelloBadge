@@ -52,10 +52,18 @@ object PlanningEngine {
         val blocks = dayEvents
             .filter { it.duration > Duration.ZERO }
             .sortedWith(compareBy({ it.start }, { it.end }))
-            .map { WorkBlock(it.start, it.end, it.title, it.note) }
+            .map {
+                WorkBlock(it.start, it.end, it.title, it.note, config.notifiesFor(it.title))
+            }
 
         if (blocks.isEmpty()) return DayPlan.Empty(date)
-        return DayPlan.Work(date, blocks, remindersFor(blocks, config))
+
+        // Les créneaux de réserve et les types mis en sourdine restent affichés avec leurs
+        // horaires, mais sont retirés du calcul : les bornes se recalculent sur ce qui reste,
+        // si bien qu'une demi-journée en sourdine ne laisse pas un rappel orphelin.
+        val notifying = blocks.filter(WorkBlock::notifies)
+        val reminders = if (notifying.isEmpty()) emptyList() else remindersFor(notifying, config)
+        return DayPlan.Work(date, blocks, reminders)
     }
 
     /**

@@ -18,13 +18,14 @@ class NotificationActionReceiver : BroadcastReceiver() {
         val scheduler = AlarmScheduler(context)
 
         when (intent.action) {
-            // Le badgeage est fait : on coupe la relance qui était armée.
-            ReminderIntents.ACTION_BADGED -> scheduler.cancelNag(id)
+            // Le badgeage est fait : on coupe toute la chaîne de relances.
+            ReminderIntents.ACTION_BADGED -> scheduler.cancelChain(id)
 
-            // Report : on rejoue le même rappel un peu plus tard.
+            // Report : on interrompt la chaîne en cours et on rejoue le rappel plus tard.
             ReminderIntents.ACTION_SNOOZE -> {
-                scheduler.cancelNag(id)
-                scheduler.scheduleDelayedFire(intent, id, SNOOZE_MINUTES)
+                val attempt = intent.getIntExtra(ReminderIntents.EXTRA_ATTEMPT, 0)
+                scheduler.cancelChain(id)
+                scheduler.scheduleFollowUp(intent, id, attempt + 1, SNOOZE_MINUTES)
             }
         }
     }

@@ -8,6 +8,7 @@ import fr.gaddiction.skellobadge.domain.PlanningEvent
 import fr.gaddiction.skellobadge.domain.Reminder
 import fr.gaddiction.skellobadge.domain.ReminderKind
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -18,7 +19,8 @@ import java.time.ZoneId
 /**
  * Le jeu d'essai reproduit les cas réellement présents dans un flux Skello : jour de
  * repos codé de minuit à minuit, journée coupée, deux services enchaînés sans écart,
- * journée continue, service de soirée, et un jour de changement d'heure de 25 h.
+ * journée continue, service de soirée, créneau de réserve « ou off », et un jour de
+ * changement d'heure de 25 h.
  */
 class PlanningEngineTest {
 
@@ -40,15 +42,18 @@ class PlanningEngineTest {
     private fun day(date: String, cfg: PlanningConfig = config): DayPlan =
         days(cfg).first { it.date == LocalDate.parse(date) }
 
+    private fun work(date: String, cfg: PlanningConfig = config): DayPlan.Work =
+        day(date, cfg) as DayPlan.Work
+
     private fun remindersOf(date: String, cfg: PlanningConfig = config): List<Reminder> =
-        (day(date, cfg) as DayPlan.Work).reminders
+        work(date, cfg).reminders
 
     private fun at(reminder: Reminder): LocalTime = reminder.at.toLocalTime()
 
     @Test
     fun `parses every event and strips the Skello prefix`() {
         val parsed = events()
-        assertEquals(9, parsed.size)
+        assertEquals(10, parsed.size)
         assertTrue(parsed.none { it.title.startsWith("Shift:") })
     }
 
@@ -74,6 +79,11 @@ class PlanningEngineTest {
     }
 
     @Test
+    fun `every non working day of the sample is recognised`() {
+        assertEquals(3, days().count { it is DayPlan.Off })
+    }
+
+    @Test
     fun `a split day yields four reminders around a real break`() {
         val reminders = remindersOf("2026-09-07")
         assertEquals(
@@ -85,9 +95,9 @@ class PlanningEngineTest {
             ),
             reminders.map { it.kind },
         )
-        assertEquals(LocalTime.of(11, 25), at(reminders[0]))
+        assertEquals(LocalTime.of(11, 29), at(reminders[0]))
         assertEquals(LocalTime.of(12, 15), at(reminders[1]))
-        assertEquals(LocalTime.of(12, 55), at(reminders[2]))
+        assertEquals(LocalTime.of(12, 59), at(reminders[2]))
         assertEquals(LocalTime.of(17, 0), at(reminders[3]))
     }
 
@@ -103,7 +113,7 @@ class PlanningEngineTest {
             listOf(ReminderKind.CLOCK_IN, ReminderKind.SHIFT_CHANGE, ReminderKind.CLOCK_OUT),
             reminders.map { it.kind },
         )
-        assertEquals(LocalTime.of(9, 55), at(reminders[0]))
+        assertEquals(LocalTime.of(9, 59), at(reminders[0]))
         assertEquals(LocalTime.of(19, 0), at(reminders[1]))
         assertEquals(LocalTime.of(21, 0), at(reminders[2]))
         assertEquals("EG ou Bureau → Equipe Mobile", reminders[1].title)
@@ -111,32 +121,20 @@ class PlanningEngineTest {
 
     @Test
     fun `the two shifts of a chained day are never merged`() {
-        val plan = day("2026-09-10") as DayPlan.Work
-        assertEquals(2, plan.blocks.size)
-    }
-
-    @Test
-    fun `a continuous day yields only a clock in and a clock out`() {
-        val reminders = remindersOf("2026-08-27")
-        assertEquals(
-            listOf(ReminderKind.CLOCK_IN, ReminderKind.CLOCK_OUT),
-            reminders.map { it.kind },
-        )
-        assertEquals(LocalTime.of(9, 30), at(reminders[0]))
-        assertEquals(LocalTime.of(19, 5), at(reminders[1]))
+        assertEquals(2, work("2026-09-10").blocks.size)
     }
 
     @Test
     fun `an evening shift is handled like any other`() {
         val reminders = remindersOf("2026-09-04")
-        assertEquals(LocalTime.of(17, 55), at(reminders[0]))
+        assertEquals(LocalTime.of(17, 59), at(reminders[0]))
         assertEquals(LocalTime.of(20, 0), at(reminders[1]))
     }
 
     /** Vérifie à la fois le dépliage des lignes et le déséchappement du texte. */
     @Test
     fun `a folded and escaped note is recovered whole`() {
-        val note = (day("2026-08-27") as DayPlan.Work).blocks.single().note
+        val note = work("2026-08-27").blocks.single().note
         assertNotNull(note)
         assertTrue(note!!.contains("Rdv à 9h30 sur place"))
         assertTrue(note.contains("Prévoir le matériel"))
@@ -144,13 +142,8 @@ class PlanningEngineTest {
     }
 
     @Test
-    fun `the midday fallback stays off by default`() {
-        assertEquals(2, remindersOf("2026-08-27").size)
-    }
-
-    @Test
-    fun `the midday fallback adds a break when explicitly enabled`() {
-        val reminders = remindersOf("2026-08-27", config.copy(lunchFallbackEnabled = true))
+    fun `the midday fallback is on by default and covers a continuous day`() {
+        val reminders = remindersOf("2026-08-27")
         assertEquals(
             listOf(
                 ReminderKind.CLOCK_IN,
@@ -161,7 +154,88 @@ class PlanningEngineTest {
             reminders.map { it.kind },
         )
         assertEquals(LocalTime.of(12, 0), at(reminders[1]))
-        assertEquals(LocalTime.of(12, 55), at(reminders[2]))
+        assertEquals(LocalTime.of(12, 59), at(reminders[2]))
+    }
+
+    @Test
+    fun `disabling the midday fallback leaves only the day boundaries`() {
+        val reminders = remindersOf("2026-08-27", config.copy(lunchFallbackEnabled = false))
+        assertEquals(
+            listOf(ReminderKind.CLOCK_IN, ReminderKind.CLOCK_OUT),
+            reminders.map { it.kind },
+        )
+        assertEquals(LocalTime.of(9, 34), at(reminders[0]))
+        assertEquals(LocalTime.of(19, 5), at(reminders[1]))
+    }
+
+    /**
+     * « EG ou Off » désigne une journée de réserve : la présence n'est requise qu'en
+     * renfort. Le créneau reste visible au planning avec ses horaires, mais ne sonne pas.
+     */
+    @Test
+    fun `a standby shift stays visible but never rings`() {
+        val plan = work("2026-09-06")
+        assertEquals(1, plan.blocks.size)
+        assertEquals("EG ou Off", plan.blocks.single().title)
+        assertFalse(plan.blocks.single().notifies)
+        assertTrue(plan.reminders.isEmpty())
+    }
+
+    @Test
+    fun `clearing the standby patterns makes the joker shift ring again`() {
+        val plan = work("2026-09-06", config.copy(standbyPatterns = emptySet()))
+        assertTrue(plan.blocks.single().notifies)
+        assertEquals(2, plan.reminders.size)
+    }
+
+    @Test
+    fun `a shift type put on mute produces no reminder`() {
+        val muted = config.copy(disabledTypes = setOf("Equipe Mobile"))
+        val evening = work("2026-09-04", muted)
+        assertFalse(evening.blocks.single().notifies)
+        assertTrue(evening.reminders.isEmpty())
+    }
+
+    /**
+     * Sur une journée mixte, seul le créneau encore actif compte : les bornes se
+     * recalculent dessus au lieu de laisser un rappel orphelin sur le créneau muet.
+     */
+    @Test
+    fun `muting one shift of a chained day recomputes the remaining boundaries`() {
+        // Repli de midi neutralisé pour n'observer que l'effet de la mise en sourdine.
+        val muted = config.copy(
+            disabledTypes = setOf("Equipe Mobile"),
+            lunchFallbackEnabled = false,
+        )
+        val plan = work("2026-09-10", muted)
+
+        // Les deux créneaux restent affichés, mais la bascule de 19h disparaît : la fin de
+        // journée est désormais la fin du seul créneau encore actif.
+        assertEquals(2, plan.blocks.size)
+        assertEquals(
+            listOf(ReminderKind.CLOCK_IN, ReminderKind.CLOCK_OUT),
+            plan.reminders.map { it.kind },
+        )
+        assertEquals(LocalTime.of(9, 59), at(plan.reminders[0]))
+        assertEquals(LocalTime.of(19, 0), at(plan.reminders[1]))
+    }
+
+    /**
+     * Sur la même journée, le repli de midi s'applique bien au créneau restant : c'est le
+     * comportement voulu, mais il vaut la peine d'être fixé explicitement.
+     */
+    @Test
+    fun `the midday fallback still applies to what remains after muting`() {
+        val muted = config.copy(disabledTypes = setOf("Equipe Mobile"))
+        assertEquals(
+            listOf(
+                ReminderKind.CLOCK_IN,
+                ReminderKind.BREAK_OUT,
+                ReminderKind.BREAK_IN,
+                ReminderKind.CLOCK_OUT,
+            ),
+            remindersOf("2026-09-10", muted).map { it.kind },
+        )
     }
 
     /**
@@ -170,7 +244,7 @@ class PlanningEngineTest {
      * Régression constatée sur un émulateur réglé en UTC : la détection convertissait
      * d'abord l'événement dans le fuseau du téléphone, si bien qu'un repos de 00h00
      * Europe/Paris se lisait 22h00 la veille et redevenait une journée travaillée. Les
-     * douze jours non travaillés du planning avaient purement disparu.
+     * jours non travaillés du planning avaient purement disparu.
      */
     @Test
     fun `the interpretation does not depend on the device time zone`() {
@@ -180,13 +254,8 @@ class PlanningEngineTest {
         assertTrue(fromUtc.first { it.date == LocalDate.parse("2026-09-05") } is DayPlan.Off)
 
         val split = fromUtc.first { it.date == LocalDate.parse("2026-09-07") } as DayPlan.Work
-        assertEquals(LocalTime.of(11, 25), split.reminders.first().at.toLocalTime())
+        assertEquals(LocalTime.of(11, 29), split.reminders.first().at.toLocalTime())
         assertEquals(LocalTime.of(17, 0), split.reminders.last().at.toLocalTime())
-    }
-
-    @Test
-    fun `every non working day of the sample is recognised`() {
-        assertEquals(3, days().count { it is DayPlan.Off })
     }
 
     /** Une même minute ne peut pas porter deux rappels de même nature. */
