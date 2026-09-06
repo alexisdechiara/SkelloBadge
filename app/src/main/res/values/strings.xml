@@ -30,7 +30,7 @@
     <string name="notif_late_prefix">Retard de %1$d min ·</string>
 
     <string name="notif_sync_error_title">Planning non récupéré</string>
-    <string name="notif_sync_error_text">Les rappels reposent sur la dernière version connue.</string>
+    <string name="notif_sync_error_text">Rien de neuf depuis %1$s. Les rappels reposent sur la dernière version connue.</string>
 
     <string name="action_badged">J’ai badgé</string>
     <string name="action_snooze">Dans 5 min</string>

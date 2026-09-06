@@ -12,6 +12,7 @@ import androidx.work.WorkerParameters
 import fr.gaddiction.skellobadge.data.PlanningRepository
 import fr.gaddiction.skellobadge.data.SettingsRepository
 import fr.gaddiction.skellobadge.domain.PlanningEngine
+import fr.gaddiction.skellobadge.notify.SyncNotification
 import java.time.Duration
 import java.time.ZonedDateTime
 import java.util.concurrent.TimeUnit
@@ -55,24 +56,37 @@ class RefreshWorker(
             // Les journées déclarées travaillées ne valent que pour leur date : une fois
             // passées, elles ne servent plus qu'à faire grossir les préférences.
             val today = now.toLocalDate()
-            settingsRepository.update {
+
+            // Une lecture du cache n'est pas une mise à jour : dater l'une comme l'autre
+            // ferait passer pour frais un planning qui ne l'est plus depuis des jours.
+            val refreshed = snapshot.error == null && !snapshot.fromCache
+            val at = System.currentTimeMillis()
+
+            val updated = settingsRepository.update {
                 it.copy(
                     knownShiftTypes = it.knownShiftTypes + discovered,
                     workingStandbyDates = it.workingStandbyDates.filter { iso ->
                         runCatching { !java.time.LocalDate.parse(iso).isBefore(today) }
                             .getOrDefault(false)
                     }.toSet(),
-                    lastSyncEpochMillis = System.currentTimeMillis(),
+                    lastSyncEpochMillis = if (refreshed) at else it.lastSyncEpochMillis,
                     lastSyncError = snapshot.error.orEmpty(),
                 )
             }
+            SyncNotification.update(applicationContext, updated.lastSyncEpochMillis, at)
+
             Log.i(TAG, "Replanification terminee: " + reminders.size + " rappels")
             Result.success()
         } catch (t: Throwable) {
             Log.e(TAG, "Echec de la replanification", t)
-            settingsRepository.update {
+            val updated = settingsRepository.update {
                 it.copy(lastSyncError = t.message ?: t.javaClass.simpleName)
             }
+            SyncNotification.update(
+                applicationContext,
+                updated.lastSyncEpochMillis,
+                System.currentTimeMillis(),
+            )
             Result.retry()
         }
     }

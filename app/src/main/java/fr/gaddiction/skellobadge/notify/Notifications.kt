@@ -1,8 +1,13 @@
 package fr.gaddiction.skellobadge.notify
 
+import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
 import fr.gaddiction.skellobadge.R
 import fr.gaddiction.skellobadge.domain.ReminderKind
@@ -31,6 +36,19 @@ object Notifications {
         ReminderKind.SHIFT_CHANGE -> CHANNEL_SHIFT_CHANGE
         ReminderKind.CLOCK_OUT -> CHANNEL_CLOCK_OUT
         ReminderKind.STANDBY_CONFIRM -> CHANNEL_STANDBY
+    }
+
+    /**
+     * POST_NOTIFICATIONS n'existe comme permission d'exécution qu'à partir d'Android 13.
+     * En dessous, l'interroger renvoie « refusée » et bloquerait silencieusement toutes
+     * les notifications sur Android 8 à 12, que cette application prend en charge.
+     */
+    fun canPost(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            return NotificationManagerCompat.from(context).areNotificationsEnabled()
+        }
+        return ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
     }
 
     fun createChannels(context: Context) {

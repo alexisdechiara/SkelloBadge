@@ -1,41 +1,24 @@
 package fr.gaddiction.skellobadge.notify
 
-import android.Manifest
 import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import androidx.core.content.ContextCompat
 import fr.gaddiction.skellobadge.R
 import fr.gaddiction.skellobadge.domain.ReminderKind
 import fr.gaddiction.skellobadge.schedule.ReminderIntents
 
 object ReminderNotification {
 
-    // La permission est vérifiée juste en dessous, par une voie que lint ne suit pas.
+    // La permission est vérifiée par Notifications.canPost, que lint ne sait pas suivre.
     @SuppressLint("MissingPermission")
     fun post(context: Context, payload: ReminderPayload, source: Intent) {
-        if (!canPost(context)) return
+        if (!Notifications.canPost(context)) return
         NotificationManagerCompat.from(context)
             .notify(payload.id, build(context, payload, source))
-    }
-
-    /**
-     * POST_NOTIFICATIONS n'existe comme permission d'exécution qu'à partir d'Android 13.
-     * En dessous, l'interroger renvoie « refusée » et bloquerait silencieusement toutes
-     * les notifications sur Android 8 à 12, que cette application prend en charge.
-     */
-    private fun canPost(context: Context): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-            return NotificationManagerCompat.from(context).areNotificationsEnabled()
-        }
-        return ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
-            PackageManager.PERMISSION_GRANTED
     }
 
     private fun build(context: Context, payload: ReminderPayload, source: Intent) =

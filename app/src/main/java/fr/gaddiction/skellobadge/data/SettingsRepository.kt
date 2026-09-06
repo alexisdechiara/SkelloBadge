@@ -27,7 +27,8 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun current(): AppSettings = settings.first()
 
-    suspend fun update(transform: (AppSettings) -> AppSettings) {
+    /** Renvoie l'état obtenu, pour éviter une relecture juste après une écriture. */
+    suspend fun update(transform: (AppSettings) -> AppSettings): AppSettings {
         val updated = transform(current())
         context.dataStore.edit { prefs ->
             prefs[Keys.CONFIGURED] = updated.configured
@@ -68,6 +69,7 @@ class SettingsRepository(private val context: Context) {
                 prefs[wordingBodyKey(kind)] = wording.body
             }
         }
+        return updated
     }
 
     private fun decode(prefs: Preferences): AppSettings {
