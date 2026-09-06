@@ -13,12 +13,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -134,7 +135,6 @@ fun HomeScreen(viewModel: AppViewModel, settings: AppSettings, onOpenSettings: (
                             today = today,
                             declaredWorking = settings.worksOn(day.date),
                             onToggleWorking = { viewModel.toggleWorkingDay(day.date) },
-                            contactName = settings.contactName,
                             onMessageContact = settings.contactNumber
                                 .takeIf(String::isNotBlank)
                                 ?.let { number ->
@@ -142,9 +142,9 @@ fun HomeScreen(viewModel: AppViewModel, settings: AppSettings, onOpenSettings: (
                                         runCatching {
                                             context.startActivity(Contacts.messageIntent(number))
                                         }
-                                        Unit
                                     }
                                 },
+                            isStandbyShift = settings::isStandby,
                         )
                     }
                 }
@@ -271,12 +271,23 @@ private fun DayCard(
     today: LocalDate,
     declaredWorking: Boolean,
     onToggleWorking: () -> Unit,
-    contactName: String,
     onMessageContact: (() -> Unit)?,
+    isStandbyShift: (String) -> Boolean,
 ) {
     val isToday = day.date == today
     val isRest = day is DayPlan.Off || day is DayPlan.Empty
     val haptics = rememberHaptics()
+
+    // Aucun rappel de badgeage sur cette journée. Deux causes possibles, qui ne se
+    // racontent pas pareil : une journée de réserve, ou un type de service non suivi.
+    // La demande de confirmation, elle, est portée par la veille.
+    val isStandby = day is DayPlan.Work &&
+        day.reminders.none { it.kind != ReminderKind.STANDBY_CONFIRM }
+    val standbyLabel = if (day is DayPlan.Work && day.blocks.any { isStandbyShift(it.title) }) {
+        "Journée de réserve · aucun rappel"
+    } else {
+        "Service non suivi · aucun rappel"
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -320,68 +331,75 @@ private fun DayCard(
                 is DayPlan.Work -> {
                     day.blocks.forEach { block -> BlockRow(block) }
 
-                    // Une journée de réserve n'a aucun rappel de badgeage ; la demande de
-                    // confirmation, elle, est portée par la veille.
-                    if (day.reminders.none { it.kind != ReminderKind.STANDBY_CONFIRM }) {
+                    if (isStandby) {
                         Text(
-                            "Journée de réserve · aucun rappel",
+                            standbyLabel,
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 8.dp),
                         )
-                        // Le jour où l'on est appelé en renfort est celui où un oubli coûte
-                        // le plus cher : il faut pouvoir rétablir les rappels d'un geste.
-                        //
-                        // Bouton plein plutôt que tonal : sur la carte du jour, qui a déjà
-                        // un fond teinté, un bouton tonal s'y confond et cesse de se lire
-                        // comme une commande.
-                        Button(
-                            onClick = { haptics.confirm(); onToggleWorking() },
-                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                        ) { Text("Je travaille ce jour") }
-                    } else {
-                        if (declaredWorking) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(top = 8.dp),
-                            ) {
-                                Text(
-                                    "Rappels rétablis pour ce jour",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.weight(1f),
-                                )
-                                TextButton(onClick = { haptics.click(); onToggleWorking() }) {
-                                    Text("Annuler")
-                                }
+                    } else if (declaredWorking) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(top = 8.dp),
+                        ) {
+                            Text(
+                                "Rappels rétablis pour ce jour",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.weight(1f),
+                            )
+                            TextButton(onClick = { haptics.click(); onToggleWorking() }) {
+                                Text("Annuler")
                             }
                         }
                     }
                 }
             }
 
-            // Les rappels s'affichent quel que soit le type de journée : la demande de
-            // confirmation d'une réserve tombe la veille, qui est souvent un jour de repos.
-            //
+            // Seuls les badgeages sont listés. L'heure de la demande n'apporte rien ici :
+            // le bouton dit déjà quoi faire, et la carte du prochain rappel donne l'heure.
+            val badgeReminders = day.reminders
+                .filterNot { it.kind == ReminderKind.STANDBY_CONFIRM }
+
             // Une journée coupée en porte quatre : sur un écran étroit ils doivent pouvoir
             // passer à la ligne plutôt que d'être tronqués.
-            if (day.reminders.isNotEmpty()) {
+            if (badgeReminders.isNotEmpty()) {
                 FlowRow(
                     modifier = Modifier.padding(top = 10.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    day.reminders.forEach { ReminderChip(it) }
+                    badgeReminders.forEach { ReminderChip(it) }
                 }
             }
 
-            // Le jour où la question se pose, y répondre doit tenir en un geste.
-            val asks = day.reminders.any { it.kind == ReminderKind.STANDBY_CONFIRM }
-            if (asks && onMessageContact != null) {
-                FilledTonalButton(
-                    onClick = { haptics.confirm(); onMessageContact() },
+            // Les deux actions de la journée vivent côte à côte. Demander au responsable est
+            // la démarche du jour, donc l'action principale ; déclarer que l'on travaille
+            // reste une correction ponctuelle, en retrait.
+            val onAsk = onMessageContact
+                ?.takeIf { day.reminders.any { r -> r.kind == ReminderKind.STANDBY_CONFIRM } }
+            if (isStandby || onAsk != null) {
+                Row(
                     modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
-                ) { Text("Écrire à " + contactName) }
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    if (isStandby) {
+                        OutlinedButton(
+                            onClick = { haptics.confirm(); onToggleWorking() },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.secondary,
+                            ),
+                        ) { Text("Je travaille ce jour") }
+                    }
+                    if (onAsk != null) {
+                        Button(
+                            onClick = { haptics.confirm(); onAsk() },
+                            modifier = Modifier.weight(1f),
+                        ) { Text("Demander") }
+                    }
+                }
             }
         }
     }

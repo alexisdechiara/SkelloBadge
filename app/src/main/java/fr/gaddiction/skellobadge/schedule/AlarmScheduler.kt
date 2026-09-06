@@ -105,15 +105,6 @@ class AlarmScheduler(private val context: Context) {
     }
 
     /**
-     * Rappel de démonstration quelques secondes plus tard.
-     *
-     * Emprunte exactement le même chemin qu'un vrai rappel — alarme exacte, récepteur,
-     * notification, ouverture de la badgeuse — pour que chacun puisse vérifier sur son
-     * propre téléphone que la chaîne fonctionne. C'est le seul moyen de détecter à
-     * l'avance une surcouche constructeur qui étoufferait les alarmes.
-     */
-
-    /**
      * Déclenche immédiatement la version escaladée du rappel.
      *
      * C'est le mécanisme le plus susceptible d'être bloqué — permission d'affichage plein
@@ -134,17 +125,32 @@ class AlarmScheduler(private val context: Context) {
         )
     }
 
+    /**
+     * Éprouve la demande de confirmation : elle emprunte un chemin différent des rappels
+     * de badgeage — canal propre, sans relance ni alarme, et surtout ouverture de la
+     * messagerie plutôt que de la badgeuse.
+     */
+    fun scheduleConfirmTest(settings: AppSettings) {
+        scheduleProbe(
+            settings,
+            kind = ReminderKind.STANDBY_CONFIRM,
+            title = "Test de la demande",
+            note = "Touche cette notification : la messagerie doit s'ouvrir sur le contact.",
+        )
+    }
+
     private fun scheduleProbe(
         settings: AppSettings,
         title: String,
         note: String,
+        kind: ReminderKind = ReminderKind.CLOCK_IN,
         forceFullScreen: Boolean = false,
     ) {
         val at = ZonedDateTime.now().plusSeconds(TEST_DELAY_SECONDS)
         val reminder = Reminder(
             at = at,
             actionAt = at,
-            kind = ReminderKind.CLOCK_IN,
+            kind = kind,
             title = title,
             note = note,
         )

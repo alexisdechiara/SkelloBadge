@@ -42,7 +42,7 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.BREAK_IN_LEAD] = updated.breakInLeadMinutes
             prefs[Keys.BREAK_OUT_LEAD] = updated.breakOutLeadMinutes
             prefs[Keys.CLOCK_OUT_LEAD] = updated.clockOutLeadMinutes
-            prefs[Keys.SHIFT_CHANGE_GAP] = updated.shiftChangeMaxGapMinutes
+            prefs[Keys.BREAK_MIN_GAP] = updated.breakMinGapMinutes
             prefs[Keys.WORKING_DATES] = updated.workingStandbyDates
             prefs[Keys.NAG_INTERVAL] = updated.nagIntervalMinutes
             prefs[Keys.NAG_MAX] = updated.nagMaxCount
@@ -93,8 +93,7 @@ class SettingsRepository(private val context: Context) {
             breakOutLeadMinutes = prefs[Keys.BREAK_OUT_LEAD] ?: defaults.breakOutLeadMinutes,
             clockOutLeadMinutes = prefs[Keys.CLOCK_OUT_LEAD] ?: defaults.clockOutLeadMinutes,
             workingStandbyDates = prefs[Keys.WORKING_DATES] ?: defaults.workingStandbyDates,
-            shiftChangeMaxGapMinutes = prefs[Keys.SHIFT_CHANGE_GAP]
-                ?: defaults.shiftChangeMaxGapMinutes,
+            breakMinGapMinutes = prefs[Keys.BREAK_MIN_GAP] ?: defaults.breakMinGapMinutes,
             nagIntervalMinutes = prefs[Keys.NAG_INTERVAL] ?: defaults.nagIntervalMinutes,
             nagMaxCount = prefs[Keys.NAG_MAX] ?: defaults.nagMaxCount,
             fullScreenAlarmEnabled = prefs[Keys.FULLSCREEN_ENABLED]
@@ -144,7 +143,8 @@ class SettingsRepository(private val context: Context) {
         val BREAK_OUT_LEAD = intPreferencesKey("break_out_lead")
         val CLOCK_OUT_LEAD = intPreferencesKey("clock_out_lead")
         val WORKING_DATES = stringSetPreferencesKey("working_standby_dates")
-        val SHIFT_CHANGE_GAP = intPreferencesKey("shift_change_gap")
+        // Clé neuve : l'ancienne portait un seuil de sens inverse, qu'il ne faut pas hériter.
+        val BREAK_MIN_GAP = intPreferencesKey("break_min_gap")
         val NAG_INTERVAL = intPreferencesKey("nag_interval")
         val NAG_MAX = intPreferencesKey("nag_max")
         val FULLSCREEN_ENABLED = booleanPreferencesKey("fullscreen_enabled")

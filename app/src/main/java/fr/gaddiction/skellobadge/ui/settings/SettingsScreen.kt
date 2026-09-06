@@ -105,7 +105,8 @@ fun SettingsScreen(
             Section(
                 title = "Horaires",
                 summary = "Entrées " + settings.clockInLeadMinutes + " min avant · sorties " +
-                    settings.clockOutLeadMinutes + " min avant",
+                    settings.clockOutLeadMinutes + " min avant · pause dès " +
+                    settings.breakMinGapMinutes + " min",
                 initiallyExpanded = true,
             ) {
                 Stepper(
@@ -138,12 +139,13 @@ fun SettingsScreen(
                 ) { viewModel.update { s -> s.copy(clockOutLeadMinutes = it) } }
 
                 Stepper(
-                    "Écart maximal pour un enchaînement",
-                    settings.shiftChangeMaxGapMinutes,
+                    "Écart minimal pour une pause",
+                    settings.breakMinGapMinutes,
                     0..60,
                     haptics,
-                    subtitle = "En dessous, deux services collés donnent un seul rappel",
-                ) { viewModel.update { s -> s.copy(shiftChangeMaxGapMinutes = it) } }
+                    subtitle = "En dessous, deux services qui s'enchaînent ne donnent " +
+                        "qu'un rappel groupé",
+                ) { viewModel.update { s -> s.copy(breakMinGapMinutes = it) } }
             }
 
             Section(
@@ -155,14 +157,8 @@ fun SettingsScreen(
                     "Relance " + settings.nagIntervalMinutes + " min · sans alarme"
                 },
             ) {
-                Stepper(
-                    "Intervalle entre deux relances",
-                    settings.nagIntervalMinutes,
-                    0..30,
-                    haptics,
-                    subtitle = "0 pour ne jamais relancer",
-                ) { viewModel.update { s -> s.copy(nagIntervalMinutes = it) } }
-
+                // L'interrupteur en tête : ce qu'il fait apparaître se place en dessous,
+                // de sorte que le reste de la section ne se déplace pas quand on le bascule.
                 ListItem(
                     headlineContent = { Text("Alarme plein écran") },
                     supportingContent = {
@@ -190,6 +186,14 @@ fun SettingsScreen(
                         haptics,
                     ) { viewModel.update { s -> s.copy(fullScreenAlarmAfterMinutes = it) } }
                 }
+
+                Stepper(
+                    "Intervalle entre deux relances",
+                    settings.nagIntervalMinutes,
+                    0..30,
+                    haptics,
+                    subtitle = "0 pour ne jamais relancer",
+                ) { viewModel.update { s -> s.copy(nagIntervalMinutes = it) } }
             }
 
             Section(
@@ -373,8 +377,25 @@ fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
                 ) { Text("Déclencher l'alarme plein écran") }
 
+                OutlinedButton(
+                    onClick = { haptics.confirm(); viewModel.sendConfirmTest() },
+                    enabled = settings.contactNumber.isNotBlank(),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
+                ) { Text("Envoyer une demande de confirmation") }
+
                 Text(
-                    "Les deux arrivent au bout d'une seconde et empruntent le chemin complet " +
+                    if (settings.contactNumber.isBlank()) {
+                        "Choisis d'abord un responsable dans « Journées à confirmer »."
+                    } else {
+                        "Touche la notification : la messagerie doit s'ouvrir sur " +
+                            settings.contactName.ifBlank { settings.contactNumber } + "."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                )
+
+                Text(
+                    "Les trois arrivent au bout d'une seconde et empruntent le chemin complet " +
                         "d'un vrai rappel. L'alarme s'ouvre directement, sans avoir à " +
                         "verrouiller l'écran.",
                     style = MaterialTheme.typography.bodySmall,

@@ -134,11 +134,14 @@ data class PlanningConfig(
     val breakOutLead: Duration = Duration.ZERO,
 
     /**
-     * En dessous de cet écart, deux créneaux consécutifs sont traités comme un
-     * changement de poste (un seul rappel groupé) plutôt que comme une pause
-     * (deux rappels distincts). Au-delà, c'est une vraie coupure.
+     * Écart à partir duquel deux créneaux consécutifs constituent une pause — sortie puis
+     * retour, deux rappels distincts. En dessous, ils sont traités comme un changement de
+     * poste et n'en donnent qu'un, groupé.
+     *
+     * À zéro, tout écart est une pause : même deux services strictement collés donnent une
+     * sortie et une entrée, ce qu'exige un pointage qui les distingue.
      */
-    val shiftChangeMaxGap: Duration = Duration.ofMinutes(5),
+    val breakMinGap: Duration = Duration.ZERO,
 
     /**
      * Skello encode les jours non travaillés comme un créneau de minuit à minuit.

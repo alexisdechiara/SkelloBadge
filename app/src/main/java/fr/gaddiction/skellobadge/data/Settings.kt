@@ -38,6 +38,9 @@ data class Wording(val title: String, val body: String) {
          * Chaque titre désigne une action distincte. « Badge ta sortie » servait autrefois
          * au départ en pause comme à la fin de poste : sur un écran verrouillé, à 12h05
          * comme à 17h00, on lisait la même phrase au moment précis où il faut décider vite.
+         *
+         * Départ et retour restent neutres à dessein : selon l'écart au planning, ils
+         * couvrent aussi bien une coupure du midi qu'un enchaînement de deux services.
          */
         val DEFAULTS: Map<ReminderKind, Wording> = mapOf(
             ReminderKind.CLOCK_IN to Wording(
@@ -45,11 +48,11 @@ data class Wording(val title: String, val body: String) {
                 "Entrée à {heure} · {poste}",
             ),
             ReminderKind.BREAK_OUT to Wording(
-                "Badge ton départ en pause",
-                "Pause à partir de {heure}",
+                "Badge ton départ",
+                "Sortie à {heure}",
             ),
             ReminderKind.BREAK_IN to Wording(
-                "Badge ton retour de pause",
+                "Badge ton retour",
                 "Reprise à {heure} · {poste}",
             ),
             ReminderKind.SHIFT_CHANGE to Wording(
@@ -91,7 +94,8 @@ data class AppSettings(
     /** Les sorties sont rappelées à l'heure pile par défaut : badger trop tôt fausserait le pointage. */
     val breakOutLeadMinutes: Int = 0,
     val clockOutLeadMinutes: Int = 0,
-    val shiftChangeMaxGapMinutes: Int = 5,
+    /** Écart à partir duquel deux créneaux consécutifs comptent comme une pause. */
+    val breakMinGapMinutes: Int = 0,
 
     /** Intervalle entre deux relances tant que le badgeage n'est pas confirmé. */
     val nagIntervalMinutes: Int = 1,

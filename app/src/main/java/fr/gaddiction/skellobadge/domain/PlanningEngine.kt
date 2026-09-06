@@ -229,28 +229,33 @@ object PlanningEngine {
 
         blocks.zipWithNext { current, next ->
             val gap = Duration.between(current.end, next.start)
-            if (gap <= config.shiftChangeMaxGap) {
-                // Postes enchaînés : on badge la sortie puis l'entrée dans la foulée.
+            if (gap >= config.breakMinGap) {
+                // Deux pointages distincts : on sort d'un créneau, on entre dans le suivant.
+                val outAt = current.end.minus(config.breakOutLead)
                 reminders += Reminder(
-                    at = current.end,
-                    actionAt = current.end,
-                    kind = ReminderKind.SHIFT_CHANGE,
-                    title = "${current.title} → ${next.title}",
-                    note = next.note,
-                )
-            } else {
-                reminders += Reminder(
-                    at = current.end.minus(config.breakOutLead),
+                    at = outAt,
                     actionAt = current.end,
                     kind = ReminderKind.BREAK_OUT,
                     title = current.title,
                     note = null,
                 )
+                // Le préavis de retour ne doit jamais précéder la sortie qu'il suit : sur
+                // deux services collés, prévenir de la reprise avant d'avoir dit de sortir
+                // inverserait les deux gestes à l'écran.
                 reminders += Reminder(
-                    at = next.start.minus(config.breakInLead),
+                    at = maxOf(next.start.minus(config.breakInLead), outAt),
                     actionAt = next.start,
                     kind = ReminderKind.BREAK_IN,
                     title = next.title,
+                    note = next.note,
+                )
+            } else {
+                // Écart trop court pour une pause : un seul rappel, groupé.
+                reminders += Reminder(
+                    at = current.end,
+                    actionAt = current.end,
+                    kind = ReminderKind.SHIFT_CHANGE,
+                    title = "${current.title} → ${next.title}",
                     note = next.note,
                 )
             }

@@ -108,6 +108,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /** Éprouve la demande de confirmation et l'ouverture de la messagerie. */
+    fun sendConfirmTest() {
+        viewModelScope.launch {
+            AlarmScheduler(getApplication()).scheduleConfirmTest(settingsRepository.current())
+        }
+    }
+
     /**
      * Vérifie le lien avant de valider la configuration.
      *

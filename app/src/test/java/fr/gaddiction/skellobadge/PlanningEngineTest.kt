@@ -12,6 +12,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
@@ -236,21 +237,64 @@ class PlanningEngineTest {
     }
 
     /**
-     * Deux services collés ne constituent pas une pause, mais il faut tout de même
-     * badger la sortie de l'un et l'entrée de l'autre : un seul rappel groupé, et non
-     * deux notifications simultanées.
+     * Écart minimal à zéro, le réglage par défaut : deux services collés se badgent
+     * quand même séparément, sortie puis entrée. Le préavis d'entrée est ramené à
+     * l'heure de la sortie pour que les deux gestes restent dans l'ordre.
      */
     @Test
-    fun `back to back shifts yield a single shift change reminder`() {
+    fun `back to back shifts yield an exit then an entry`() {
         val reminders = remindersOf("2026-09-10")
         assertEquals(
-            listOf(ReminderKind.CLOCK_IN, ReminderKind.SHIFT_CHANGE, ReminderKind.CLOCK_OUT),
+            listOf(
+                ReminderKind.CLOCK_IN,
+                ReminderKind.BREAK_OUT,
+                ReminderKind.BREAK_IN,
+                ReminderKind.CLOCK_OUT,
+            ),
             reminders.map { it.kind },
         )
         assertEquals(LocalTime.of(9, 59), at(reminders[0]))
         assertEquals(LocalTime.of(19, 0), at(reminders[1]))
-        assertEquals(LocalTime.of(21, 0), at(reminders[2]))
+        assertEquals(LocalTime.of(19, 0), at(reminders[2]))
+        assertEquals(LocalTime.of(21, 0), at(reminders[3]))
+        assertEquals("EG ou Bureau", reminders[1].title)
+        assertEquals("Equipe Mobile", reminders[2].title)
+    }
+
+    /**
+     * Au-delà de zéro, l'écart minimal retrouve son rôle de seuil : un enchaînement sans
+     * coupure passe sous la barre et ne donne plus qu'un rappel, groupé.
+     */
+    @Test
+    fun `a threshold turns back to back shifts back into a single reminder`() {
+        val reminders = remindersOf(
+            "2026-09-10",
+            config.copy(breakMinGap = Duration.ofMinutes(5)),
+        )
+        assertEquals(
+            listOf(ReminderKind.CLOCK_IN, ReminderKind.SHIFT_CHANGE, ReminderKind.CLOCK_OUT),
+            reminders.map { it.kind },
+        )
+        assertEquals(LocalTime.of(19, 0), at(reminders[1]))
         assertEquals("EG ou Bureau → Equipe Mobile", reminders[1].title)
+    }
+
+    /** Un seuil ne doit pas avaler une vraie coupure : 45 min restent une pause. */
+    @Test
+    fun `a threshold leaves a real break untouched`() {
+        val reminders = remindersOf(
+            "2026-09-07",
+            config.copy(breakMinGap = Duration.ofMinutes(5)),
+        )
+        assertEquals(
+            listOf(
+                ReminderKind.CLOCK_IN,
+                ReminderKind.BREAK_OUT,
+                ReminderKind.BREAK_IN,
+                ReminderKind.CLOCK_OUT,
+            ),
+            reminders.map { it.kind },
+        )
     }
 
     @Test
