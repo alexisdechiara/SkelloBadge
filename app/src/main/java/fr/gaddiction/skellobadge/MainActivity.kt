@@ -58,6 +58,11 @@ private fun AppRoot() {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     var showSettings by remember { mutableStateOf(false) }
 
+    // La reconfiguration est un état d'écran, pas un état enregistré : la configuration
+    // précédente reste valide tant que la nouvelle n'a pas été validée, et en sortir ne
+    // laisse jamais l'application à moitié configurée.
+    var reconfiguring by remember { mutableStateOf(false) }
+
     val current = settings
     when {
         current == null -> Box(
@@ -65,9 +70,26 @@ private fun AppRoot() {
             contentAlignment = Alignment.Center,
         ) { CircularProgressIndicator() }
 
-        !current.configured -> OnboardingScreen(viewModel, current)
+        !current.configured || reconfiguring -> OnboardingScreen(
+            viewModel = viewModel,
+            settings = current,
+            onCancel = if (current.configured) {
+                { reconfiguring = false }
+            } else {
+                null
+            },
+            onDone = { reconfiguring = false },
+        )
 
-        showSettings -> SettingsScreen(viewModel, current) { showSettings = false }
+        showSettings -> SettingsScreen(
+            viewModel = viewModel,
+            settings = current,
+            onReconfigure = {
+                showSettings = false
+                reconfiguring = true
+            },
+            onBack = { showSettings = false },
+        )
 
         else -> HomeScreen(viewModel, current) { showSettings = true }
     }

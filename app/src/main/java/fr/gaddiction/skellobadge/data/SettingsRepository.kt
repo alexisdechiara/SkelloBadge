@@ -49,6 +49,8 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.FULLSCREEN_ENABLED] = updated.fullScreenAlarmEnabled
             prefs[Keys.FULLSCREEN_AFTER] = updated.fullScreenAlarmAfterMinutes
             prefs[Keys.LUNCH_FALLBACK] = updated.lunchFallbackEnabled
+            prefs[Keys.LUNCH_START] = updated.lunchStartMinutes
+            prefs[Keys.LUNCH_END] = updated.lunchEndMinutes
             prefs[Keys.STANDBY_PATTERNS] = updated.standbyPatterns
             prefs[Keys.DISABLED_TYPES] = updated.disabledShiftTypes
             prefs[Keys.KNOWN_TYPES] = updated.knownShiftTypes
@@ -95,6 +97,8 @@ class SettingsRepository(private val context: Context) {
             fullScreenAlarmAfterMinutes = prefs[Keys.FULLSCREEN_AFTER]
                 ?: defaults.fullScreenAlarmAfterMinutes,
             lunchFallbackEnabled = prefs[Keys.LUNCH_FALLBACK] ?: defaults.lunchFallbackEnabled,
+            lunchStartMinutes = prefs[Keys.LUNCH_START] ?: defaults.lunchStartMinutes,
+            lunchEndMinutes = prefs[Keys.LUNCH_END] ?: defaults.lunchEndMinutes,
             standbyPatterns = prefs[Keys.STANDBY_PATTERNS] ?: defaults.standbyPatterns,
             disabledShiftTypes = prefs[Keys.DISABLED_TYPES] ?: defaults.disabledShiftTypes,
             knownShiftTypes = prefs[Keys.KNOWN_TYPES] ?: defaults.knownShiftTypes,
@@ -136,6 +140,8 @@ class SettingsRepository(private val context: Context) {
         val FULLSCREEN_ENABLED = booleanPreferencesKey("fullscreen_enabled")
         val FULLSCREEN_AFTER = intPreferencesKey("fullscreen_after")
         val LUNCH_FALLBACK = booleanPreferencesKey("lunch_fallback")
+        val LUNCH_START = intPreferencesKey("lunch_start_minutes")
+        val LUNCH_END = intPreferencesKey("lunch_end_minutes")
         val STANDBY_PATTERNS = stringSetPreferencesKey("standby_patterns")
         val DISABLED_TYPES = stringSetPreferencesKey("disabled_types")
         val KNOWN_TYPES = stringSetPreferencesKey("known_types")

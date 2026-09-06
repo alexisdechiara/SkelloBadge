@@ -105,6 +105,15 @@ class AlarmScheduler(private val context: Context) {
     }
 
     /**
+     * Rappel de démonstration quelques secondes plus tard.
+     *
+     * Emprunte exactement le même chemin qu'un vrai rappel — alarme exacte, récepteur,
+     * notification, ouverture de la badgeuse — pour que chacun puisse vérifier sur son
+     * propre téléphone que la chaîne fonctionne. C'est le seul moyen de détecter à
+     * l'avance une surcouche constructeur qui étoufferait les alarmes.
+     */
+
+    /**
      * Déclenche immédiatement la version escaladée du rappel.
      *
      * C'est le mécanisme le plus susceptible d'être bloqué — permission d'affichage plein
@@ -121,10 +130,16 @@ class AlarmScheduler(private val context: Context) {
             ),
             title = "Test de l'alarme plein écran",
             note = "Si cet écran ne s'est pas ouvert, la permission plein écran est refusée.",
+            forceFullScreen = true,
         )
     }
 
-    private fun scheduleProbe(settings: AppSettings, title: String, note: String) {
+    private fun scheduleProbe(
+        settings: AppSettings,
+        title: String,
+        note: String,
+        forceFullScreen: Boolean = false,
+    ) {
         val at = ZonedDateTime.now().plusSeconds(TEST_DELAY_SECONDS)
         val reminder = Reminder(
             at = at,
@@ -135,7 +150,10 @@ class AlarmScheduler(private val context: Context) {
         )
         setExact(
             at.toInstant().toEpochMilli(),
-            pendingFor(ReminderIntents.fire(context, reminder, settings), reminder.id),
+            pendingFor(
+                ReminderIntents.fire(context, reminder, settings, forceFullScreen),
+                reminder.id,
+            ),
         )
     }
 
@@ -186,7 +204,7 @@ class AlarmScheduler(private val context: Context) {
         const val PREFS_NAME = "alarm_bookkeeping"
         const val KEY_PENDING = "pending_alarms"
         const val MILLIS_PER_MINUTE = 60_000L
-        const val TEST_DELAY_SECONDS = 10L
+        const val TEST_DELAY_SECONDS = 1L
         const val CANCEL_FLAGS = PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
 
         /**

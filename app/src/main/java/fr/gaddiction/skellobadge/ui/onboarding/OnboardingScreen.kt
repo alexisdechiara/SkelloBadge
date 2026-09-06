@@ -68,14 +68,29 @@ import kotlinx.coroutines.withContext
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun OnboardingScreen(viewModel: AppViewModel, settings: AppSettings) {
+fun OnboardingScreen(
+    viewModel: AppViewModel,
+    settings: AppSettings,
+    /** Non nul seulement en reconfiguration : à la première installation, il n'y a rien où revenir. */
+    onCancel: (() -> Unit)?,
+    onDone: () -> Unit,
+) {
     val haptics = rememberHaptics()
     var step by remember { mutableStateOf(0) }
     var draft by remember { mutableStateOf(settings) }
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text(stepTitle(step)) })
+            TopAppBar(
+                title = { Text(stepTitle(step)) },
+                actions = {
+                    // Rien n'est écrit tant que « Terminer » n'a pas été touché : sortir
+                    // en cours de route laisse la configuration précédente intacte.
+                    onCancel?.let { cancel ->
+                        TextButton(onClick = { haptics.click(); cancel() }) { Text("Annuler") }
+                    }
+                },
+            )
         },
     ) { padding ->
         Column(
@@ -122,6 +137,7 @@ fun OnboardingScreen(viewModel: AppViewModel, settings: AppSettings) {
                             step++
                         } else {
                             viewModel.update { draft.copy(configured = true) }
+                            onDone()
                         }
                     },
                     enabled = canContinue(step, draft),

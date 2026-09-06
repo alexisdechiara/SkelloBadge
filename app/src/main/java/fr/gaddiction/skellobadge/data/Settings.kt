@@ -92,8 +92,11 @@ data class AppSettings(
     val fullScreenAlarmEnabled: Boolean = true,
     val fullScreenAlarmAfterMinutes: Int = 5,
 
-    /** Rappel de coupure sur les journées longues dont le planning ne prévoit rien. */
+    /** Rappel de pause sur les journées longues dont le planning ne prévoit rien. */
     val lunchFallbackEnabled: Boolean = true,
+    /** Bornes de la pause forcée, en minutes depuis minuit. */
+    val lunchStartMinutes: Int = 12 * 60,
+    val lunchEndMinutes: Int = 13 * 60,
 
     /**
      * Un créneau dont le libellé contient l'un de ces fragments est une journée de

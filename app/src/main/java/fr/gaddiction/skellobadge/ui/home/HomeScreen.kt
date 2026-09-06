@@ -12,10 +12,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -286,7 +286,11 @@ private fun DayCard(
                         )
                         // Le jour où l'on est appelé en renfort est celui où un oubli coûte
                         // le plus cher : il faut pouvoir rétablir les rappels d'un geste.
-                        FilledTonalButton(
+                        //
+                        // Bouton plein plutôt que tonal : sur la carte du jour, qui a déjà
+                        // un fond teinté, un bouton tonal s'y confond et cesse de se lire
+                        // comme une commande.
+                        Button(
                             onClick = { haptics.confirm(); onToggleWorking() },
                             modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                         ) { Text("Je travaille ce jour") }

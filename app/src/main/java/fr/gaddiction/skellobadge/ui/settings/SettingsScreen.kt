@@ -14,12 +14,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -28,7 +31,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,9 +42,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import fr.gaddiction.skellobadge.R
 import fr.gaddiction.skellobadge.data.AppSettings
 import fr.gaddiction.skellobadge.data.PlanningSource
 import fr.gaddiction.skellobadge.domain.ReminderKind
@@ -54,7 +61,12 @@ import java.util.Locale
 private val STAMP = DateTimeFormatter.ofPattern("d MMMM 'à' HH'h'mm", Locale.FRANCE)
 
 @Composable
-fun SettingsScreen(viewModel: AppViewModel, settings: AppSettings, onBack: () -> Unit) {
+fun SettingsScreen(
+    viewModel: AppViewModel,
+    settings: AppSettings,
+    onReconfigure: () -> Unit,
+    onBack: () -> Unit,
+) {
     val fromPlanning by viewModel.shiftTypes.collectAsStateWithLifecycle()
     val haptics = rememberHaptics()
 
@@ -175,13 +187,18 @@ fun SettingsScreen(viewModel: AppViewModel, settings: AppSettings, onBack: () ->
 
             Section(
                 title = "Pause",
-                summary = if (settings.lunchFallbackEnabled) "Forcée à 12h et 13h" else "Désactivée",
+                summary = if (settings.lunchFallbackEnabled) {
+                    "Forcée de " + formatMinutes(settings.lunchStartMinutes) +
+                        " à " + formatMinutes(settings.lunchEndMinutes)
+                } else {
+                    "Désactivée"
+                },
             ) {
                 ListItem(
-                    headlineContent = { Text("Pause de midi forcée") },
+                    headlineContent = { Text("Pause forcée") },
                     supportingContent = {
                         Text(
-                            "Ajoute un rappel à 12h et 13h sur les journées longues dont le " +
+                            "Ajoute un départ et un retour sur les journées longues dont le " +
                                 "planning ne prévoit aucune pause.",
                         )
                     },
@@ -195,6 +212,30 @@ fun SettingsScreen(viewModel: AppViewModel, settings: AppSettings, onBack: () ->
                         )
                     },
                 )
+
+                if (settings.lunchFallbackEnabled) {
+                    TimeField(
+                        label = "Début de la pause",
+                        minutes = settings.lunchStartMinutes,
+                        haptics = haptics,
+                    ) { viewModel.update { s -> s.copy(lunchStartMinutes = it) } }
+
+                    TimeField(
+                        label = "Fin de la pause",
+                        minutes = settings.lunchEndMinutes,
+                        haptics = haptics,
+                    ) { viewModel.update { s -> s.copy(lunchEndMinutes = it) } }
+
+                    if (settings.lunchEndMinutes <= settings.lunchStartMinutes) {
+                        Text(
+                            "La fin doit être postérieure au début, sans quoi aucun rappel de " +
+                                "pause ne sera posé.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                        )
+                    }
+                }
             }
 
             Section(
@@ -243,6 +284,36 @@ fun SettingsScreen(viewModel: AppViewModel, settings: AppSettings, onBack: () ->
             }
 
             Section(
+                title = "Tests",
+                summary = "Vérifier que ce téléphone laisse passer les rappels",
+            ) {
+                Text(
+                    "À faire une fois sur chaque téléphone avant d'en dépendre. Certaines " +
+                        "surcouches constructeur étouffent les alarmes en veille sans rien dire.",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                )
+
+                OutlinedButton(
+                    onClick = { haptics.confirm(); viewModel.sendTestReminder() },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
+                ) { Text("Envoyer une notification de test") }
+
+                OutlinedButton(
+                    onClick = { haptics.confirm(); viewModel.sendFullScreenTest() },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
+                ) { Text("Déclencher l'alarme plein écran") }
+
+                Text(
+                    "Les deux arrivent au bout d'une seconde et empruntent le chemin complet " +
+                        "d'un vrai rappel. L'alarme s'ouvre directement, sans avoir à " +
+                        "verrouiller l'écran.",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                )
+            }
+
+            Section(
                 title = "Configuration",
                 summary = settings.targetLabel.ifBlank { "Badgeuse" },
             ) {
@@ -269,37 +340,74 @@ fun SettingsScreen(viewModel: AppViewModel, settings: AppSettings, onBack: () ->
                 }
 
                 OutlinedButton(
-                    onClick = { haptics.confirm(); viewModel.sendTestReminder() },
+                    onClick = { haptics.click(); onReconfigure() },
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
-                ) { Text("Envoyer un rappel de test dans 10 s") }
+                ) { Text("Changer de planning ou de badgeuse") }
 
                 Text(
-                    "Emprunte le même chemin qu'un vrai rappel. Si rien n'arrive, c'est que " +
-                        "la surcouche du téléphone bloque les alarmes en veille.",
+                    "Rouvre les trois écrans d'installation. Rien n'est modifié tant que tu " +
+                        "n'as pas validé ; tu peux en sortir à tout moment.",
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(horizontal = 20.dp),
                 )
-
-                OutlinedButton(
-                    onClick = { haptics.confirm(); viewModel.sendFullScreenTest() },
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
-                ) { Text("Tester l'alarme plein écran") }
-
-                Text(
-                    "Verrouille l'écran pendant les 10 secondes qui suivent : l'alarme doit " +
-                        "s'afficher par-dessus, sonner en boucle et vibrer.",
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(horizontal = 20.dp),
-                )
-
-                OutlinedButton(
-                    onClick = { haptics.click(); viewModel.update { it.copy(configured = false) } },
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp),
-                ) { Text("Reprendre la configuration") }
             }
         }
     }
 }
+
+/**
+ * Heure réglable, ouverte sur le sélecteur Material plutôt que sur deux compteurs :
+ * choisir « 12 h 15 » doit rester un geste, pas quinze appuis.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TimeField(
+    label: String,
+    minutes: Int,
+    haptics: Haptics,
+    onChange: (Int) -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        FilledTonalButton(onClick = { haptics.click(); open = true }) {
+            Text(formatMinutes(minutes))
+        }
+    }
+
+    if (open) {
+        val state = rememberTimePickerState(
+            initialHour = minutes / 60,
+            initialMinute = minutes % 60,
+            is24Hour = true,
+        )
+        AlertDialog(
+            onDismissRequest = { open = false },
+            title = { Text(label) },
+            text = { TimePicker(state = state) },
+            confirmButton = {
+                TextButton(onClick = {
+                    haptics.confirm()
+                    onChange(state.hour * 60 + state.minute)
+                    open = false
+                }) { Text("Valider") }
+            },
+            dismissButton = {
+                TextButton(onClick = { haptics.click(); open = false }) { Text("Annuler") }
+            },
+        )
+    }
+}
+
+private fun formatMinutes(minutes: Int): String =
+    (minutes / 60).toString().padStart(2, '0') + " h " +
+        (minutes % 60).toString().padStart(2, '0')
 
 /**
  * Sélection multiple en liste déroulante.
@@ -342,7 +450,10 @@ private fun ServiceSelector(
                 modifier = Modifier.weight(1f),
                 textAlign = TextAlign.Start,
             )
-            Text("⌄")
+            Icon(
+                painter = painterResource(R.drawable.ic_chevron_down),
+                contentDescription = null,
+            )
         }
 
         // Le menu reste à hauteur constante et défile de lui-même : la liste peut grossir
@@ -473,10 +584,10 @@ private fun Section(
             )
             Text(summary, style = MaterialTheme.typography.bodySmall)
         }
-        Text(
-            "⌄",
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.primary,
+        Icon(
+            painter = painterResource(R.drawable.ic_chevron_down),
+            contentDescription = if (expanded) "Replier" else "Déplier",
+            tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier.rotate(rotation),
         )
     }

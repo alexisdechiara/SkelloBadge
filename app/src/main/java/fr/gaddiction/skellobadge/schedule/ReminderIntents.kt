@@ -36,6 +36,15 @@ object ReminderIntents {
     const val EXTRA_FULLSCREEN_ENABLED = "fullscreen_enabled"
     const val EXTRA_FULLSCREEN_AFTER = "fullscreen_after"
 
+    /**
+     * Ouvre l'écran d'alarme sans attendre que le téléphone soit verrouillé.
+     *
+     * Réservé au bouton de test : une intention plein écran n'ouvre l'activité que si
+     * l'écran est éteint ou verrouillé, sinon le système se contente d'une bannière. Pour
+     * éprouver l'écran d'alarme, il faut donc pouvoir le demander explicitement.
+     */
+    const val EXTRA_FORCE_FULLSCREEN = "force_fullscreen"
+
     const val ACTION_FIRE = "fr.gaddiction.skellobadge.FIRE"
     const val ACTION_BADGED = "fr.gaddiction.skellobadge.BADGED"
     const val ACTION_SNOOZE = "fr.gaddiction.skellobadge.SNOOZE"
@@ -50,7 +59,12 @@ object ReminderIntents {
     fun uriFor(id: Int, attempt: Int): Uri =
         Uri.parse(SCHEME + "://reminder/" + id + "/" + attempt)
 
-    fun fire(context: Context, reminder: Reminder, settings: AppSettings): Intent {
+    fun fire(
+        context: Context,
+        reminder: Reminder,
+        settings: AppSettings,
+        forceFullScreen: Boolean = false,
+    ): Intent {
         val wording = settings.wordingFor(reminder.kind)
         val time = TIME.format(reminder.actionAt)
 
@@ -69,6 +83,7 @@ object ReminderIntents {
             putExtra(EXTRA_NAG_MAX, settings.nagMaxCount)
             putExtra(EXTRA_FULLSCREEN_ENABLED, settings.fullScreenAlarmEnabled)
             putExtra(EXTRA_FULLSCREEN_AFTER, settings.fullScreenAlarmAfterMinutes)
+            putExtra(EXTRA_FORCE_FULLSCREEN, forceFullScreen)
             when (settings.targetKind) {
                 BadgeTarget.APP -> putExtra(EXTRA_TARGET_PACKAGE, settings.targetPackage)
                 BadgeTarget.URL -> putExtra(EXTRA_TARGET_URL, settings.targetUrl)

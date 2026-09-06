@@ -24,6 +24,8 @@ data class ReminderPayload(
     val nagMaxCount: Int,
     val fullScreenEnabled: Boolean,
     val fullScreenAfterMinutes: Int,
+    /** Test : ouvrir l'écran d'alarme immédiatement, sans attendre un écran verrouillé. */
+    val forceFullScreen: Boolean = false,
 ) {
     /** Depuis combien de minutes le rappel est resté sans réponse. */
     val ignoredForMinutes: Int get() = attempt * nagIntervalMinutes
@@ -64,6 +66,8 @@ data class ReminderPayload(
                     intent.getBooleanExtra(ReminderIntents.EXTRA_FULLSCREEN_ENABLED, false),
                 fullScreenAfterMinutes =
                     intent.getIntExtra(ReminderIntents.EXTRA_FULLSCREEN_AFTER, 0),
+                forceFullScreen =
+                    intent.getBooleanExtra(ReminderIntents.EXTRA_FORCE_FULLSCREEN, false),
             )
         }
     }

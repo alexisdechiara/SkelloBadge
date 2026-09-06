@@ -10,6 +10,7 @@ import fr.gaddiction.skellobadge.domain.PlanningEngine
 import fr.gaddiction.skellobadge.domain.PlanningEvent
 import java.time.Duration
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZonedDateTime
 
@@ -111,6 +112,8 @@ fun AppSettings.toPlanningConfig(): PlanningConfig = PlanningConfig(
     clockOutLead = Duration.ofMinutes(clockOutLeadMinutes.toLong()),
     shiftChangeMaxGap = Duration.ofMinutes(shiftChangeMaxGapMinutes.toLong()),
     lunchFallbackEnabled = lunchFallbackEnabled,
+    lunchFallbackOut = LocalTime.ofSecondOfDay(lunchStartMinutes * 60L),
+    lunchFallbackIn = LocalTime.ofSecondOfDay(lunchEndMinutes * 60L),
     standbyPatterns = standbyPatterns,
     disabledTypes = disabledShiftTypes,
     workingDates = workingStandbyDates.mapNotNull(::parseIsoDate).toSet(),

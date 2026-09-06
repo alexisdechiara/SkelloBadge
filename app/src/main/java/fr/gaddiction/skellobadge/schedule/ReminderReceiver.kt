@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import fr.gaddiction.skellobadge.notify.FullScreenAlarmActivity
 import fr.gaddiction.skellobadge.notify.ReminderNotification
 import fr.gaddiction.skellobadge.notify.ReminderPayload
 
@@ -30,6 +31,15 @@ class ReminderReceiver : BroadcastReceiver() {
             "Rappel " + payload.id + " tentative " + payload.attempt +
                 (if (payload.shouldEscalate) " (plein ecran)" else ""),
         )
+
+        // Une intention plein écran n'ouvre l'activité que si l'écran est éteint ou
+        // verrouillé. Le test doit pouvoir montrer l'écran d'alarme sans cette condition :
+        // l'application vient d'être au premier plan, le lancement est donc autorisé.
+        if (payload.forceFullScreen) {
+            runCatching {
+                context.startActivity(FullScreenAlarmActivity.intent(context, intent))
+            }.onFailure { Log.w(TAG, "Ouverture directe de l'alarme refusee", it) }
+        }
 
         if (payload.hasFollowUp) {
             AlarmScheduler(context).scheduleFollowUp(
