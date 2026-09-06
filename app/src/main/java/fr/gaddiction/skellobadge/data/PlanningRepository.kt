@@ -116,7 +116,8 @@ fun AppSettings.toPlanningConfig(): PlanningConfig = PlanningConfig(
     lunchFallbackIn = LocalTime.ofSecondOfDay(lunchEndMinutes * 60L),
     standbyPatterns = standbyPatterns,
     standbyAskEnabled = standbyAskEnabled,
-    standbyAskTime = LocalTime.ofSecondOfDay(standbyAskMinutes * 60L),
+    askTimeWorking = LocalTime.ofSecondOfDay(askWorkingMinutes * 60L),
+    askTimeRest = LocalTime.ofSecondOfDay(askRestMinutes * 60L),
     disabledTypes = disabledShiftTypes,
     workingDates = workingStandbyDates.mapNotNull(::parseIsoDate).toSet(),
 )

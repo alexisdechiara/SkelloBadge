@@ -18,6 +18,8 @@ data class ReminderPayload(
     val actionAt: ZonedDateTime,
     val targetPackage: String?,
     val targetUrl: String?,
+    /** Renseigné uniquement pour la demande de confirmation. */
+    val contactNumber: String? = null,
     /** 0 pour le rappel initial, puis 1, 2, 3... pour chaque relance. */
     val attempt: Int,
     val nagIntervalMinutes: Int,
@@ -59,6 +61,7 @@ data class ReminderPayload(
                 actionAt = Instant.ofEpochMilli(actionAtMillis).atZone(zone),
                 targetPackage = intent.getStringExtra(ReminderIntents.EXTRA_TARGET_PACKAGE),
                 targetUrl = intent.getStringExtra(ReminderIntents.EXTRA_TARGET_URL),
+                contactNumber = intent.getStringExtra(ReminderIntents.EXTRA_CONTACT_NUMBER),
                 attempt = intent.getIntExtra(ReminderIntents.EXTRA_ATTEMPT, 0),
                 nagIntervalMinutes = intent.getIntExtra(ReminderIntents.EXTRA_NAG_INTERVAL, 0),
                 nagMaxCount = intent.getIntExtra(ReminderIntents.EXTRA_NAG_MAX, 0),

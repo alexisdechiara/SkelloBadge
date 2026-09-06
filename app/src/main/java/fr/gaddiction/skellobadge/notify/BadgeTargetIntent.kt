@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import fr.gaddiction.skellobadge.MainActivity
+import fr.gaddiction.skellobadge.data.Contacts
 
 /**
  * Construit l'intention qui ouvre la badgeuse.
@@ -19,6 +20,11 @@ object BadgeTargetIntent {
     }
 
     private fun forTarget(context: Context, payload: ReminderPayload): Intent? {
+        // Demande de confirmation : ce n'est pas la badgeuse qu'il faut ouvrir mais la
+        // conversation avec le responsable.
+        payload.contactNumber?.takeIf(String::isNotBlank)?.let { number ->
+            return Contacts.messageIntent(number)
+        }
         payload.targetPackage?.takeIf(String::isNotBlank)?.let { packageName ->
             context.packageManager.getLaunchIntentForPackage(packageName)?.let { return it }
         }

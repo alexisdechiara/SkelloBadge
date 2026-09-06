@@ -165,11 +165,17 @@ data class PlanningConfig(
     val standbyPatterns: Set<String> = setOf("ou off"),
 
     /**
-     * Rappel, la veille au soir, de demander au responsable si l'on remplace quelqu'un.
-     * Le planning lui-même porte souvent la consigne « à confirmer la veille ».
+     * Rappel, la veille, de demander au responsable ce qu'il en est. Le planning lui-même
+     * porte souvent la consigne « à confirmer la veille » sur ces créneaux.
      */
     val standbyAskEnabled: Boolean = true,
-    val standbyAskTime: LocalTime = LocalTime.of(18, 0),
+
+    /**
+     * Deux heures selon la disponibilité de la veille : en fin de journée quand on
+     * travaille, au milieu de l'après-midi quand on est en repos.
+     */
+    val askTimeWorking: LocalTime = LocalTime.of(17, 0),
+    val askTimeRest: LocalTime = LocalTime.of(14, 0),
 
     /** Types de service que l'utilisateur a explicitement mis en sourdine. */
     val disabledTypes: Set<String> = emptySet(),
@@ -192,4 +198,13 @@ data class PlanningConfig(
         val normalized = title.lowercase()
         return standbyPatterns.any { it.isNotBlank() && normalized.contains(it.lowercase()) }
     }
+
+    /**
+     * Le libellé annonce-t-il une alternative — « EG ou Bureau », « EG ou Off » ?
+     *
+     * Ces journées ont en commun de n'être fixées que la veille. Elles n'ont en revanche
+     * pas les mêmes conséquences : « EG ou Bureau » se travaille dans les deux cas et
+     * garde donc ses rappels de badgeage, là où « EG ou Off » peut se solder par un repos.
+     */
+    fun isAlternativeTitle(title: String): Boolean = title.lowercase().contains(" ou ")
 }

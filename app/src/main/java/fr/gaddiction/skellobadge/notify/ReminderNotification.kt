@@ -11,6 +11,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import fr.gaddiction.skellobadge.R
+import fr.gaddiction.skellobadge.domain.ReminderKind
 import fr.gaddiction.skellobadge.schedule.ReminderIntents
 
 object ReminderNotification {
@@ -54,17 +55,23 @@ object ReminderNotification {
             .setContentIntent(
                 activity(context, payload.id, BadgeTargetIntent.resolve(context, payload)),
             )
-            .addAction(
-                0,
-                context.getString(R.string.action_badged),
-                action(context, payload, source, ReminderIntents.ACTION_BADGED),
-            )
-            .addAction(
-                0,
-                context.getString(R.string.action_snooze),
-                action(context, payload, source, ReminderIntents.ACTION_SNOOZE),
-            )
             .apply {
+                // « J'ai badgé » n'a aucun sens sur une demande de confirmation : il n'y a
+                // rien à badger, et le simple fait de toucher la notification ouvre déjà
+                // la conversation avec le responsable.
+                if (payload.kind != ReminderKind.STANDBY_CONFIRM) {
+                    addAction(
+                        0,
+                        context.getString(R.string.action_badged),
+                        action(context, payload, source, ReminderIntents.ACTION_BADGED),
+                    )
+                    addAction(
+                        0,
+                        context.getString(R.string.action_snooze),
+                        action(context, payload, source, ReminderIntents.ACTION_SNOOZE),
+                    )
+                }
+
                 if (payload.shouldEscalate) {
                     // L'intention plein écran ouvre l'alarme par-dessus l'écran de
                     // verrouillage. Si le système la refuse — permission non accordée sur

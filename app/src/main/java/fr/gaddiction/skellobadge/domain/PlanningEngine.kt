@@ -46,19 +46,28 @@ object PlanningEngine {
 
         val byDate = days.associateByTo(LinkedHashMap()) { it.date }
 
-        days.filter { isStandbyDay(it, config) }
+        days.filter { needsConfirmation(it, config) }
             .filter { day ->
-                // Premier jour de sa série : la veille n'est pas une réserve, ou l'est
+                // Premier jour de sa série : la veille n'est pas à confirmer, ou l'est
                 // pour un autre évènement.
                 val previous = byDate[day.date.minusDays(1)]
                 previous == null ||
-                    !isStandbyDay(previous, config) ||
+                    !needsConfirmation(previous, config) ||
                     describe(previous) != describe(day)
             }
             .forEach { day ->
                 val eve = day.date.minusDays(1)
-                val block = (day as DayPlan.Work).blocks.first()
-                val at = eve.atTime(config.standbyAskTime).atZone(block.start.zone)
+                val block = (day as DayPlan.Work).blocks
+                    .first { config.isAlternativeTitle(it.title) }
+
+                // L'heure suit la disponibilité de la veille : en fin de journée si l'on
+                // travaille, plus tôt si l'on est en repos.
+                val time = if (isWorked(byDate[eve])) {
+                    config.askTimeWorking
+                } else {
+                    config.askTimeRest
+                }
+                val at = eve.atTime(time).atZone(block.start.zone)
 
                 val reminder = Reminder(
                     at = at,
@@ -80,14 +89,21 @@ object PlanningEngine {
     }
 
     /**
-     * Journée de réserve : uniquement des créneaux de réserve, et non déclarée travaillée.
-     * Une fois la journée déclarée travaillée, la question ne se pose plus.
+     * Journée à confirmer : au moins un créneau annonce une alternative.
+     *
+     * « EG ou Bureau » comme « EG ou Off » ne sont fixés que la veille, et méritent donc
+     * la même question — même si le premier se travaille dans les deux cas. Déclarer la
+     * journée travaillée y répond par avance et fait disparaître le rappel.
      */
-    private fun isStandbyDay(day: DayPlan, config: PlanningConfig): Boolean {
+    private fun needsConfirmation(day: DayPlan, config: PlanningConfig): Boolean {
         if (day !is DayPlan.Work) return false
         if (day.date in config.workingDates) return false
-        return day.blocks.isNotEmpty() && day.blocks.all { config.isStandbyTitle(it.title) }
+        return day.blocks.any { config.isAlternativeTitle(it.title) }
     }
+
+    /** La veille est-elle travaillée ? Détermine l'heure à laquelle on est joignable. */
+    private fun isWorked(day: DayPlan?): Boolean =
+        day is DayPlan.Work && day.blocks.any { it.notifies }
 
     /**
      * Empreinte de la description, insensible à la casse et aux espaces : Skello reformate

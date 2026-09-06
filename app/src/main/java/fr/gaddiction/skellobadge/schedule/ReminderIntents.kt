@@ -30,6 +30,9 @@ object ReminderIntents {
     const val EXTRA_TARGET_PACKAGE = "target_package"
     const val EXTRA_TARGET_URL = "target_url"
 
+    /** Numéro du responsable : le rappel de confirmation ouvre la messagerie dessus. */
+    const val EXTRA_CONTACT_NUMBER = "contact_number"
+
     /** 0 pour le rappel initial, puis 1, 2, 3... pour chaque relance. */
     const val EXTRA_ATTEMPT = "attempt"
     const val EXTRA_NAG_INTERVAL = "nag_interval"
@@ -92,7 +95,9 @@ object ReminderIntents {
             )
             putExtra(EXTRA_FULLSCREEN_AFTER, settings.fullScreenAlarmAfterMinutes)
             putExtra(EXTRA_FORCE_FULLSCREEN, forceFullScreen)
-            if (!isErrand) {
+            if (isErrand) {
+                putExtra(EXTRA_CONTACT_NUMBER, settings.contactNumber)
+            } else {
                 when (settings.targetKind) {
                     BadgeTarget.APP -> putExtra(EXTRA_TARGET_PACKAGE, settings.targetPackage)
                     BadgeTarget.URL -> putExtra(EXTRA_TARGET_URL, settings.targetUrl)

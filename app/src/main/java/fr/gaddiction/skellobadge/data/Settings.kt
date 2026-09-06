@@ -129,8 +129,16 @@ data class AppSettings(
      * Le planning porte lui-même la consigne « à confirmer la veille » sur ces créneaux.
      */
     val standbyAskEnabled: Boolean = true,
-    /** Heure de la demande, la veille, en minutes depuis minuit. */
-    val standbyAskMinutes: Int = 18 * 60,
+    /**
+     * Heure de la demande, la veille, en minutes depuis minuit. Deux valeurs selon la
+     * disponibilité : fin de journée quand on travaille, milieu d'après-midi en repos.
+     */
+    val askWorkingMinutes: Int = 17 * 60,
+    val askRestMinutes: Int = 14 * 60,
+
+    /** Responsable à qui poser la question, choisi dans les contacts du téléphone. */
+    val contactName: String = "",
+    val contactNumber: String = "",
 
     /** Types de service explicitement mis en sourdine par l'utilisateur. */
     val disabledShiftTypes: Set<String> = emptySet(),
@@ -168,9 +176,13 @@ data class AppSettings(
         }
 
     companion object {
-        /** « Skello : la badgeuse » sur le Play Store. */
+        /**
+         * « Skello : la badgeuse » sur le Play Store, mais l'application s'installe sous
+         * le nom « Badgeuse » : c'est ce libellé-là que l'utilisateur reconnaît, et celui
+         * sur lequel il faut chercher dans la liste des applications.
+         */
         const val SKELLO_PUNCH_CLOCK_PACKAGE = "com.skellopunchclock"
-        const val SKELLO_PUNCH_CLOCK_LABEL = "Skello : la badgeuse"
+        const val SKELLO_PUNCH_CLOCK_LABEL = "Badgeuse"
 
         /** L'application des équipes, au cas où ce serait elle la cible voulue. */
         const val SKELLO_TEAM_PACKAGE = "app.skello.skello"

@@ -306,7 +306,9 @@ private fun TargetStep(draft: AppSettings, onChange: (AppSettings) -> Unit) {
 
     when (draft.targetKind) {
         BadgeTarget.APP -> {
-            var query by remember { mutableStateOf("skello") }
+            // L'application s'installe sous le nom « Badgeuse » : c'est ce libellé que
+            // l'utilisateur cherche, pas celui du Play Store.
+            var query by remember { mutableStateOf("badgeuse") }
             val apps by produceState(initialValue = emptyList<InstalledApps.Entry>()) {
                 value = withContext(Dispatchers.IO) { InstalledApps.launchable(context) }
             }
@@ -317,7 +319,12 @@ private fun TargetStep(draft: AppSettings, onChange: (AppSettings) -> Unit) {
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
-            val filtered = apps.filter { it.label.contains(query, ignoreCase = true) }
+            // La recherche porte aussi sur le nom de paquet : « skello » retrouve ainsi
+            // com.skellopunchclock même si l'application s'affiche sous « Badgeuse ».
+            val filtered = apps.filter {
+                it.label.contains(query, ignoreCase = true) ||
+                    it.packageName.contains(query, ignoreCase = true)
+            }
             if (filtered.isEmpty()) {
                 Text(
                     when {

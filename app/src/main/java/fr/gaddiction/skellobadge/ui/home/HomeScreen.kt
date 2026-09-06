@@ -16,6 +16,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -27,11 +28,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fr.gaddiction.skellobadge.R
 import fr.gaddiction.skellobadge.data.AppSettings
+import fr.gaddiction.skellobadge.data.Contacts
 import fr.gaddiction.skellobadge.data.FetchErrors
 import fr.gaddiction.skellobadge.domain.DayPlan
 import fr.gaddiction.skellobadge.domain.PlanningEngine
@@ -63,6 +66,7 @@ fun HomeScreen(viewModel: AppViewModel, settings: AppSettings, onOpenSettings: (
     val planning by viewModel.planning.collectAsStateWithLifecycle()
     val loading by viewModel.loading.collectAsStateWithLifecycle()
     val haptics = rememberHaptics()
+    val context = LocalContext.current
 
     val now = ZonedDateTime.now()
     // La veille est conservée par le dépôt pour que la journée en cours reste entière
@@ -130,6 +134,17 @@ fun HomeScreen(viewModel: AppViewModel, settings: AppSettings, onOpenSettings: (
                             today = today,
                             declaredWorking = settings.worksOn(day.date),
                             onToggleWorking = { viewModel.toggleWorkingDay(day.date) },
+                            contactName = settings.contactName,
+                            onMessageContact = settings.contactNumber
+                                .takeIf(String::isNotBlank)
+                                ?.let { number ->
+                                    {
+                                        runCatching {
+                                            context.startActivity(Contacts.messageIntent(number))
+                                        }
+                                        Unit
+                                    }
+                                },
                         )
                     }
                 }
@@ -256,6 +271,8 @@ private fun DayCard(
     today: LocalDate,
     declaredWorking: Boolean,
     onToggleWorking: () -> Unit,
+    contactName: String,
+    onMessageContact: (() -> Unit)?,
 ) {
     val isToday = day.date == today
     val isRest = day is DayPlan.Off || day is DayPlan.Empty
@@ -356,6 +373,15 @@ private fun DayCard(
                 ) {
                     day.reminders.forEach { ReminderChip(it) }
                 }
+            }
+
+            // Le jour où la question se pose, y répondre doit tenir en un geste.
+            val asks = day.reminders.any { it.kind == ReminderKind.STANDBY_CONFIRM }
+            if (asks && onMessageContact != null) {
+                FilledTonalButton(
+                    onClick = { haptics.confirm(); onMessageContact() },
+                    modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                ) { Text("Écrire à " + contactName) }
             }
         }
     }

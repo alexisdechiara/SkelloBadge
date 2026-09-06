@@ -45,15 +45,19 @@ class PlanningEngineTest {
     private fun work(date: String, cfg: PlanningConfig = config): DayPlan.Work =
         day(date, cfg) as DayPlan.Work
 
+    /**
+     * Rappels de badgeage seuls : une journée peut porter en plus la demande de
+     * confirmation du lendemain, qui n'a rien à voir avec ses propres échéances.
+     */
     private fun remindersOf(date: String, cfg: PlanningConfig = config): List<Reminder> =
-        work(date, cfg).reminders
+        work(date, cfg).reminders.filterNot { it.kind == ReminderKind.STANDBY_CONFIRM }
 
     private fun at(reminder: Reminder): LocalTime = reminder.at.toLocalTime()
 
     @Test
     fun `parses every event and strips the Skello prefix`() {
         val parsed = events()
-        assertEquals(14, parsed.size)
+        assertEquals(15, parsed.size)
         assertTrue(parsed.none { it.title.startsWith("Shift:") })
     }
 
@@ -64,15 +68,49 @@ class PlanningEngineTest {
         days(cfg).flatMap { it.reminders }.filter { it.kind == ReminderKind.STANDBY_CONFIRM }
 
     /**
-     * Une journée de réserve suppose de demander la veille au responsable si l'on remplace
-     * quelqu'un. Le planning porte lui-même la consigne sur ces créneaux.
+     * Un service dont le libellé annonce une alternative n'est fixé que la veille : il
+     * faut donc penser à poser la question. Le planning porte lui-même la consigne.
      */
     @Test
-    fun `a standby day is asked about the evening before`() {
+    fun `a day to confirm is asked about the day before`() {
         val reminders = confirmationsOn("2026-09-05")
         assertEquals(1, reminders.size)
-        assertEquals(LocalTime.of(18, 0), at(reminders.single()))
         assertEquals("EG ou Off", reminders.single().title)
+    }
+
+    /** Veille en repos : on est joignable plus tôt dans l'après-midi. */
+    @Test
+    fun `the question falls at the rest time when the eve is free`() {
+        assertTrue(day("2026-09-05") is DayPlan.Off)
+        assertEquals(LocalTime.of(14, 0), at(confirmationsOn("2026-09-05").single()))
+    }
+
+    /** Veille travaillée : la question attend la fin de la journée. */
+    @Test
+    fun `the question falls at the working time when the eve is worked`() {
+        assertTrue(work("2026-08-27").blocks.single().notifies)
+        assertEquals(LocalTime.of(17, 0), at(confirmationsOn("2026-08-27").single()))
+    }
+
+    /**
+     * « EG ou Bureau » se travaille dans les deux cas : la journée garde ses rappels de
+     * badgeage tout en donnant lieu à une demande la veille.
+     */
+    @Test
+    fun `a day to confirm that is worked either way keeps its badging reminders`() {
+        val plan = work("2026-08-28")
+        assertTrue(plan.blocks.single().notifies)
+        // Journée continue de 09h à 17h : le repli de pause s'applique comme ailleurs.
+        assertEquals(
+            listOf(
+                ReminderKind.CLOCK_IN,
+                ReminderKind.BREAK_OUT,
+                ReminderKind.BREAK_IN,
+                ReminderKind.CLOCK_OUT,
+            ),
+            remindersOf("2026-08-28").map { it.kind },
+        )
+        assertEquals(1, confirmationsOn("2026-08-27").size)
     }
 
     /** La veille est ici un repos hebdomadaire : elle doit tout de même porter le rappel. */
@@ -100,9 +138,9 @@ class PlanningEngineTest {
     }
 
     @Test
-    fun `the sample yields exactly one question per standby run`() {
-        // 06/09 seul, 17-18/09 groupés, 24/09 et 25/09 séparés.
-        assertEquals(4, allConfirmations().size)
+    fun `the sample yields exactly one question per run`() {
+        // 28/08, 06/09, 07/09, 10/09, 17-18/09 groupés, 24/09 et 25/09 séparés.
+        assertEquals(7, allConfirmations().size)
     }
 
     /** Une fois la journée déclarée travaillée, la question ne se pose plus. */
@@ -120,7 +158,7 @@ class PlanningEngineTest {
     /** Une démarche, pas un badgeage : elle ne doit pas s'ajouter aux rappels de la journée. */
     @Test
     fun `a standby day still carries no badging reminder of its own`() {
-        assertTrue(work("2026-09-06").reminders.isEmpty())
+        assertTrue(remindersOf("2026-09-06").isEmpty())
     }
 
     @Test
@@ -244,7 +282,7 @@ class PlanningEngineTest {
         assertEquals(1, plan.blocks.size)
         assertEquals("EG ou Off", plan.blocks.single().title)
         assertFalse(plan.blocks.single().notifies)
-        assertTrue(plan.reminders.isEmpty())
+        assertTrue(remindersOf("2026-09-06").isEmpty())
     }
 
     /**
@@ -254,15 +292,16 @@ class PlanningEngineTest {
     @Test
     fun `declaring a standby day as worked restores its reminders`() {
         val date = LocalDate.parse("2026-09-06")
-        val plan = work("2026-09-06", config.copy(workingDates = setOf(date)))
+        val cfg = config.copy(workingDates = setOf(date))
+        val plan = work("2026-09-06", cfg)
 
         assertTrue(plan.blocks.single().notifies)
         assertEquals(
             listOf(ReminderKind.CLOCK_IN, ReminderKind.CLOCK_OUT),
-            plan.reminders.map { it.kind },
+            remindersOf("2026-09-06", cfg).map { it.kind },
         )
-        assertEquals(LocalTime.of(12, 59), at(plan.reminders.first()))
-        assertEquals(LocalTime.of(19, 0), at(plan.reminders.last()))
+        assertEquals(LocalTime.of(12, 59), at(remindersOf("2026-09-06", cfg).first()))
+        assertEquals(LocalTime.of(19, 0), at(remindersOf("2026-09-06", cfg).last()))
     }
 
     /** La déclaration l'emporte aussi sur une mise en sourdine par type. */
@@ -282,14 +321,14 @@ class PlanningEngineTest {
     @Test
     fun `a day not declared as worked stays silent`() {
         val other = config.copy(workingDates = setOf(LocalDate.parse("2026-09-14")))
-        assertTrue(work("2026-09-06", other).reminders.isEmpty())
+        assertTrue(remindersOf("2026-09-06", other).isEmpty())
     }
 
     @Test
     fun `clearing the standby patterns makes the joker shift ring again`() {
-        val plan = work("2026-09-06", config.copy(standbyPatterns = emptySet()))
-        assertTrue(plan.blocks.single().notifies)
-        assertEquals(2, plan.reminders.size)
+        val cfg = config.copy(standbyPatterns = emptySet())
+        assertTrue(work("2026-09-06", cfg).blocks.single().notifies)
+        assertEquals(2, remindersOf("2026-09-06", cfg).size)
     }
 
     @Test

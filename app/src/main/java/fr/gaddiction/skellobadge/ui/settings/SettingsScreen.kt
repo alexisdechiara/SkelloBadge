@@ -1,5 +1,8 @@
 package fr.gaddiction.skellobadge.ui.settings
 
+import android.app.Activity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
@@ -42,12 +45,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fr.gaddiction.skellobadge.R
 import fr.gaddiction.skellobadge.data.AppSettings
+import fr.gaddiction.skellobadge.data.Contacts
 import fr.gaddiction.skellobadge.data.PlanningSource
 import fr.gaddiction.skellobadge.data.Wording
 import fr.gaddiction.skellobadge.domain.ReminderKind
@@ -241,19 +246,20 @@ fun SettingsScreen(
             }
 
             Section(
-                title = "Réserve",
-                summary = if (settings.standbyAskEnabled) {
-                    "Demande la veille à " + formatMinutes(settings.standbyAskMinutes)
-                } else {
-                    "Sans demande la veille"
+                title = "Journées à confirmer",
+                summary = when {
+                    !settings.standbyAskEnabled -> "Sans demande la veille"
+                    settings.contactName.isBlank() -> "Demande la veille · contact à choisir"
+                    else -> "Demande à " + settings.contactName + " la veille"
                 },
             ) {
                 ListItem(
                     headlineContent = { Text("Demander la veille") },
                     supportingContent = {
                         Text(
-                            "La veille d'une journée de réserve, un rappel te fait penser " +
-                                "à demander si tu remplaces quelqu'un.",
+                            "Les services dont le libellé annonce une alternative — « EG ou " +
+                                "Bureau », « EG ou Off » — ne sont fixés que la veille. Un " +
+                                "rappel te fait penser à poser la question.",
                         )
                     },
                     trailingContent = {
@@ -268,15 +274,27 @@ fun SettingsScreen(
                 )
 
                 if (settings.standbyAskEnabled) {
+                    ContactPicker(settings, haptics) { entry ->
+                        viewModel.update {
+                            it.copy(contactName = entry.name, contactNumber = entry.number)
+                        }
+                    }
+
                     TimeField(
-                        label = "Heure de la demande",
-                        minutes = settings.standbyAskMinutes,
+                        label = "Si tu travailles la veille",
+                        minutes = settings.askWorkingMinutes,
                         haptics = haptics,
-                    ) { viewModel.update { s -> s.copy(standbyAskMinutes = it) } }
+                    ) { viewModel.update { s -> s.copy(askWorkingMinutes = it) } }
+
+                    TimeField(
+                        label = "Si tu es en repos la veille",
+                        minutes = settings.askRestMinutes,
+                        haptics = haptics,
+                    ) { viewModel.update { s -> s.copy(askRestMinutes = it) } }
 
                     Text(
-                        "Une seule demande par série : deux jours de réserve qui se suivent " +
-                            "relèvent du même remplacement, sauf si leurs descriptions " +
+                        "Une seule demande par série : deux journées à confirmer qui se " +
+                            "suivent relèvent du même évènement, sauf si leurs descriptions " +
                             "diffèrent au planning.",
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
@@ -403,6 +421,55 @@ fun SettingsScreen(
                 )
             }
         }
+    }
+}
+
+/**
+ * Choix du responsable dans les contacts du téléphone.
+ *
+ * Le sélecteur système n'accorde l'accès qu'au seul contact retenu : l'application n'a
+ * jamais besoin de la permission de lire l'ensemble du carnet d'adresses.
+ */
+@Composable
+private fun ContactPicker(
+    settings: AppSettings,
+    haptics: Haptics,
+    onPicked: (Contacts.Entry) -> Unit,
+) {
+    val context = LocalContext.current
+    val picker = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            result.data?.data
+                ?.let { Contacts.read(context, it) }
+                ?.let(onPicked)
+        }
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text("Responsable à contacter", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                if (settings.contactName.isBlank()) {
+                    "Aucun contact choisi. Sans lui, le rappel ouvre l'application."
+                } else {
+                    settings.contactName + " · " + settings.contactNumber
+                },
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        FilledTonalButton(
+            onClick = {
+                haptics.click()
+                runCatching { picker.launch(Contacts.pickIntent()) }
+            },
+        ) { Text(if (settings.contactName.isBlank()) "Choisir" else "Changer") }
     }
 }
 
