@@ -53,7 +53,7 @@ object PlanningEngine {
                 val previous = byDate[day.date.minusDays(1)]
                 previous == null ||
                     !needsConfirmation(previous, config) ||
-                    describe(previous) != describe(day)
+                    signature(previous, config) != signature(day, config)
             }
             .forEach { day ->
                 val eve = day.date.minusDays(1)
@@ -106,17 +106,47 @@ object PlanningEngine {
         day is DayPlan.Work && day.blocks.any { it.notifies }
 
     /**
-     * Empreinte de la description, insensible à la casse et aux espaces : Skello reformate
-     * ses notes d'une synchronisation à l'autre sans en changer le sens.
+     * Empreinte de l'évènement à confirmer, servant à reconnaître deux journées qui n'en
+     * font qu'une.
+     *
+     * Deux précautions, apprises du planning réel. D'abord, seuls les créneaux alternatifs
+     * comptent : une journée peut porter en plus un service ordinaire — « Académie de
+     * l'engagement », « Equipe Mobile » — dont la note n'a rien à voir avec la question
+     * posée, et ferait croire à un évènement différent chaque jour.
+     *
+     * Ensuite, c'est le lieu qui fait foi. Le reste de la note varie nécessairement d'un
+     * jour à l'autre — horaires, trajet, repas, équipe — alors que le lieu ne change qu'au
+     * passage d'un déplacement au suivant. Deux journées au même endroit relèvent du même
+     * évènement ; un changement de lieu en ouvre un nouveau, qui appelle sa propre question.
      */
-    private fun describe(day: DayPlan): String =
+    private fun signature(day: DayPlan, config: PlanningConfig): String =
         (day as? DayPlan.Work)
             ?.blocks
-            ?.mapNotNull { it.note }
-            ?.joinToString(separator = "")
-            ?.lowercase()
-            ?.filterNot(Char::isWhitespace)
+            ?.filter { config.isAlternativeTitle(it.title) }
+            ?.joinToString(separator = "|") { block ->
+                normalize(block.title) + "#" + normalize(venue(block.note))
+            }
             .orEmpty()
+
+    /**
+     * Lieu de l'évènement, tel que la note le désigne.
+     *
+     * Ces notes s'ouvrent sur un en-tête décrivant l'arrangement, puis, après une ligne
+     * vide, énumèrent le détail du jour en commençant par le lieu. Un marqueur seul —
+     * « Si EG : » — le précède parfois sur sa propre ligne, et se reconnaît à son
+     * deux-points final. Faute de détail, l'en-tête sert de référence.
+     */
+    private fun venue(note: String?): String {
+        val lines = note.orEmpty().lines().map(String::trim)
+        val headerEnd = lines.indexOfFirst(String::isEmpty).takeIf { it >= 0 } ?: lines.size
+        val header = lines.take(headerEnd).joinToString(separator = " ")
+        val details = lines.drop(headerEnd).filter(String::isNotEmpty)
+        return details.firstOrNull { !it.endsWith(":") } ?: header
+    }
+
+    /** Insensible à la casse et aux espaces : Skello reformate ses notes sans les changer. */
+    private fun normalize(text: String): String =
+        text.lowercase().filterNot(Char::isWhitespace)
 
     /** Tous les rappels encore à venir, dans l'ordre chronologique. */
     fun upcomingReminders(

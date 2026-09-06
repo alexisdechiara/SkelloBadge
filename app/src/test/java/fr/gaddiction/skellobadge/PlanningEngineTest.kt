@@ -57,7 +57,7 @@ class PlanningEngineTest {
     @Test
     fun `parses every event and strips the Skello prefix`() {
         val parsed = events()
-        assertEquals(15, parsed.size)
+        assertEquals(19, parsed.size)
         assertTrue(parsed.none { it.title.startsWith("Shift:") })
     }
 
@@ -137,10 +137,40 @@ class PlanningEngineTest {
         assertEquals(1, confirmationsOn("2026-09-24").size)
     }
 
+    /**
+     * Deux journées au même endroit relèvent du même déplacement, même si tout le reste
+     * de la note diffère : horaires, covoiturage, encadrant. Une seule question.
+     */
+    @Test
+    fun `two days at the same venue are asked about once`() {
+        assertEquals(1, confirmationsOn("2026-10-04").size)
+        assertTrue(confirmationsOn("2026-10-05").isEmpty())
+    }
+
+    /** Le lieu change : c'est un autre déplacement, qui appelle sa propre question. */
+    @Test
+    fun `a change of venue opens a new question`() {
+        assertEquals(1, confirmationsOn("2026-10-06").size)
+    }
+
+    /**
+     * Le service ordinaire qui partage la journée — ici une réunion de bureau — porte sa
+     * propre note, sans rapport avec la question posée. La laisser entrer dans la
+     * comparaison faisait paraître chaque jour distinct.
+     */
+    @Test
+    fun `an ordinary shift sharing the day does not break the run`() {
+        val plan = work("2026-10-05")
+        assertEquals(2, plan.blocks.size)
+        assertTrue(plan.blocks.any { !it.title.contains(" ou ") })
+        assertTrue(confirmationsOn("2026-10-05").isEmpty())
+    }
+
     @Test
     fun `the sample yields exactly one question per run`() {
-        // 28/08, 06/09, 07/09, 10/09, 17-18/09 groupés, 24/09 et 25/09 séparés.
-        assertEquals(7, allConfirmations().size)
+        // 28/08, 06/09, 07/09, 10/09, 17-18/09 groupés, 24/09, 25/09,
+        // 05-06/10 groupés (même lieu), 07/10 (lieu différent).
+        assertEquals(9, allConfirmations().size)
     }
 
     /** Une fois la journée déclarée travaillée, la question ne se pose plus. */
