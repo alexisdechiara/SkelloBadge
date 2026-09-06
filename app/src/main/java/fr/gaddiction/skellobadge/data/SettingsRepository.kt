@@ -52,6 +52,8 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.LUNCH_START] = updated.lunchStartMinutes
             prefs[Keys.LUNCH_END] = updated.lunchEndMinutes
             prefs[Keys.STANDBY_PATTERNS] = updated.standbyPatterns
+            prefs[Keys.STANDBY_ASK] = updated.standbyAskEnabled
+            prefs[Keys.STANDBY_ASK_TIME] = updated.standbyAskMinutes
             prefs[Keys.DISABLED_TYPES] = updated.disabledShiftTypes
             prefs[Keys.KNOWN_TYPES] = updated.knownShiftTypes
             prefs[Keys.LAST_SYNC] = updated.lastSyncEpochMillis
@@ -100,6 +102,8 @@ class SettingsRepository(private val context: Context) {
             lunchStartMinutes = prefs[Keys.LUNCH_START] ?: defaults.lunchStartMinutes,
             lunchEndMinutes = prefs[Keys.LUNCH_END] ?: defaults.lunchEndMinutes,
             standbyPatterns = prefs[Keys.STANDBY_PATTERNS] ?: defaults.standbyPatterns,
+            standbyAskEnabled = prefs[Keys.STANDBY_ASK] ?: defaults.standbyAskEnabled,
+            standbyAskMinutes = prefs[Keys.STANDBY_ASK_TIME] ?: defaults.standbyAskMinutes,
             disabledShiftTypes = prefs[Keys.DISABLED_TYPES] ?: defaults.disabledShiftTypes,
             knownShiftTypes = prefs[Keys.KNOWN_TYPES] ?: defaults.knownShiftTypes,
             wording = ReminderKind.entries.associateWith { kind ->
@@ -143,6 +147,8 @@ class SettingsRepository(private val context: Context) {
         val LUNCH_START = intPreferencesKey("lunch_start_minutes")
         val LUNCH_END = intPreferencesKey("lunch_end_minutes")
         val STANDBY_PATTERNS = stringSetPreferencesKey("standby_patterns")
+        val STANDBY_ASK = booleanPreferencesKey("standby_ask")
+        val STANDBY_ASK_TIME = intPreferencesKey("standby_ask_minutes")
         val DISABLED_TYPES = stringSetPreferencesKey("disabled_types")
         val KNOWN_TYPES = stringSetPreferencesKey("known_types")
         val LAST_SYNC = longPreferencesKey("last_sync")

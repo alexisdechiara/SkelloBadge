@@ -22,6 +22,7 @@ object Notifications {
     const val CHANNEL_CLOCK_OUT = "clock_out"
     const val CHANNEL_SHIFT_CHANGE = "shift_change"
     const val CHANNEL_ALARM = "alarm"
+    const val CHANNEL_STANDBY = "standby_confirm"
     const val CHANNEL_STATUS = "status"
 
     const val NOTIFICATION_ID_SYNC_ERROR = 1
@@ -31,6 +32,7 @@ object Notifications {
         ReminderKind.BREAK_OUT, ReminderKind.BREAK_IN -> CHANNEL_BREAK
         ReminderKind.SHIFT_CHANGE -> CHANNEL_SHIFT_CHANGE
         ReminderKind.CLOCK_OUT -> CHANNEL_CLOCK_OUT
+        ReminderKind.STANDBY_CONFIRM -> CHANNEL_STANDBY
     }
 
     fun createChannels(context: Context) {
@@ -60,6 +62,15 @@ object Notifications {
                     CHANNEL_SHIFT_CHANGE,
                     R.string.channel_shift_change_name,
                     R.string.channel_shift_change_desc,
+                ),
+                // Importance par défaut : c'est une démarche à ne pas oublier, pas une
+                // échéance qui doit interrompre ce qu'on est en train de faire.
+                channel(
+                    context,
+                    CHANNEL_STANDBY,
+                    R.string.channel_standby_name,
+                    R.string.channel_standby_desc,
+                    NotificationManager.IMPORTANCE_DEFAULT,
                 ),
                 alarmChannel(context),
                 channel(

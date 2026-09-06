@@ -19,12 +19,88 @@ object PlanningEngine {
      * l'établissement, et doit rester la même que l'utilisateur soit à Nice ou en
      * déplacement à l'étranger.
      */
-    fun build(events: List<PlanningEvent>, config: PlanningConfig): List<DayPlan> =
-        events
+    fun build(events: List<PlanningEvent>, config: PlanningConfig): List<DayPlan> {
+        val days = events
             .groupBy { it.start.toLocalDate() }
             .entries
             .sortedBy { it.key }
             .map { (date, dayEvents) -> buildDay(date, dayEvents, config) }
+
+        return withStandbyConfirmations(days, config)
+    }
+
+    /**
+     * Ajoute, la veille de chaque série de réserve, un rappel de demander au responsable
+     * si l'on remplace quelqu'un.
+     *
+     * Une série, et non chaque journée : deux jours de réserve qui se suivent relèvent le
+     * plus souvent du même remplacement, auquel cas une seule demande suffit. On les
+     * distingue par leur description — c'est le seul élément du planning qui dise de quel
+     * évènement il s'agit, deux réserves consécutives portant le même libellé.
+     */
+    private fun withStandbyConfirmations(
+        days: List<DayPlan>,
+        config: PlanningConfig,
+    ): List<DayPlan> {
+        if (!config.standbyAskEnabled) return days
+
+        val byDate = days.associateByTo(LinkedHashMap()) { it.date }
+
+        days.filter { isStandbyDay(it, config) }
+            .filter { day ->
+                // Premier jour de sa série : la veille n'est pas une réserve, ou l'est
+                // pour un autre évènement.
+                val previous = byDate[day.date.minusDays(1)]
+                previous == null ||
+                    !isStandbyDay(previous, config) ||
+                    describe(previous) != describe(day)
+            }
+            .forEach { day ->
+                val eve = day.date.minusDays(1)
+                val block = (day as DayPlan.Work).blocks.first()
+                val at = eve.atTime(config.standbyAskTime).atZone(block.start.zone)
+
+                val reminder = Reminder(
+                    at = at,
+                    actionAt = at,
+                    kind = ReminderKind.STANDBY_CONFIRM,
+                    title = block.title,
+                    note = day.blocks.firstNotNullOfOrNull { it.note },
+                )
+
+                byDate[eve] = when (val existing = byDate[eve]) {
+                    null -> DayPlan.Empty(eve, listOf(reminder))
+                    is DayPlan.Off -> existing.copy(reminders = existing.reminders + reminder)
+                    is DayPlan.Empty -> existing.copy(reminders = existing.reminders + reminder)
+                    is DayPlan.Work -> existing.copy(reminders = existing.reminders + reminder)
+                }
+            }
+
+        return byDate.values.sortedBy { it.date }
+    }
+
+    /**
+     * Journée de réserve : uniquement des créneaux de réserve, et non déclarée travaillée.
+     * Une fois la journée déclarée travaillée, la question ne se pose plus.
+     */
+    private fun isStandbyDay(day: DayPlan, config: PlanningConfig): Boolean {
+        if (day !is DayPlan.Work) return false
+        if (day.date in config.workingDates) return false
+        return day.blocks.isNotEmpty() && day.blocks.all { config.isStandbyTitle(it.title) }
+    }
+
+    /**
+     * Empreinte de la description, insensible à la casse et aux espaces : Skello reformate
+     * ses notes d'une synchronisation à l'autre sans en changer le sens.
+     */
+    private fun describe(day: DayPlan): String =
+        (day as? DayPlan.Work)
+            ?.blocks
+            ?.mapNotNull { it.note }
+            ?.joinToString(separator = "")
+            ?.lowercase()
+            ?.filterNot(Char::isWhitespace)
+            .orEmpty()
 
     /** Tous les rappels encore à venir, dans l'ordre chronologique. */
     fun upcomingReminders(
@@ -34,7 +110,6 @@ object PlanningEngine {
     ): List<Reminder> {
         val limit = now.plus(horizon)
         return days
-            .filterIsInstance<DayPlan.Work>()
             .flatMap { it.reminders }
             .filter { it.at.isAfter(now) && it.at.isBefore(limit) }
             .sortedBy { it.at }

@@ -16,6 +16,8 @@
     <string name="channel_clock_out_desc">Rappel de badgeage en fin de service</string>
     <string name="channel_shift_change_name">Changement de poste</string>
     <string name="channel_shift_change_desc">Bascule entre deux services enchaînés</string>
+    <string name="channel_standby_name">Réserve à confirmer</string>
+    <string name="channel_standby_desc">Rappel, la veille, de demander si tu remplaces quelqu’un</string>
     <string name="channel_alarm_name">Badgeage en retard</string>
     <string name="channel_alarm_desc">Alarme plein écran quand un rappel reste ignoré</string>
     <string name="channel_status_name">État de la synchronisation</string>

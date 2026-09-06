@@ -44,6 +44,13 @@ enum class ReminderKind {
 
     /** Fin de poste : dernier créneau de la journée. */
     CLOCK_OUT,
+
+    /**
+     * Veille d'une journée de réserve : penser à demander au responsable si l'on remplace
+     * quelqu'un. Ce n'est pas un badgeage mais une démarche, d'où l'absence de relance et
+     * d'escalade.
+     */
+    STANDBY_CONFIRM,
 }
 
 /**
@@ -82,20 +89,34 @@ data class Reminder(
     val id: Int get() = ((at.toEpochSecond() / 60L).toInt() * 8) + kind.ordinal
 }
 
-/** Ce que devient une date une fois le planning interprété. */
+/**
+ * Ce que devient une date une fois le planning interprété.
+ *
+ * Les rappels figurent sur l'interface elle-même et non sur la seule journée travaillée :
+ * la demande de confirmation d'une réserve tombe la veille, qui peut être un jour de repos
+ * ou une date absente du planning.
+ */
 sealed interface DayPlan {
     val date: LocalDate
+    val reminders: List<Reminder>
 
-    /** Jour non travaillé : repos hebdomadaire, congé, absence, férié. Silence total. */
-    data class Off(override val date: LocalDate, val label: String) : DayPlan
+    /** Jour non travaillé : repos hebdomadaire, congé, absence, férié. */
+    data class Off(
+        override val date: LocalDate,
+        val label: String,
+        override val reminders: List<Reminder> = emptyList(),
+    ) : DayPlan
 
     /** Aucun créneau au planning pour cette date. */
-    data class Empty(override val date: LocalDate) : DayPlan
+    data class Empty(
+        override val date: LocalDate,
+        override val reminders: List<Reminder> = emptyList(),
+    ) : DayPlan
 
     data class Work(
         override val date: LocalDate,
         val blocks: List<WorkBlock>,
-        val reminders: List<Reminder>,
+        override val reminders: List<Reminder>,
     ) : DayPlan
 }
 
@@ -142,6 +163,13 @@ data class PlanningConfig(
      * au planning, mais ne doit pas sonner.
      */
     val standbyPatterns: Set<String> = setOf("ou off"),
+
+    /**
+     * Rappel, la veille au soir, de demander au responsable si l'on remplace quelqu'un.
+     * Le planning lui-même porte souvent la consigne « à confirmer la veille ».
+     */
+    val standbyAskEnabled: Boolean = true,
+    val standbyAskTime: LocalTime = LocalTime.of(18, 0),
 
     /** Types de service que l'utilisateur a explicitement mis en sourdine. */
     val disabledTypes: Set<String> = emptySet(),

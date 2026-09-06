@@ -60,6 +60,10 @@ data class Wording(val title: String, val body: String) {
                 "Badge ta sortie",
                 "Fin de service à {heure}",
             ),
+            ReminderKind.STANDBY_CONFIRM to Wording(
+                "Demande à Quentin",
+                "Tu es de réserve demain sur {poste}. Remplacement ou repos ?",
+            ),
         )
     }
 }
@@ -119,6 +123,14 @@ data class AppSettings(
      * jour rétablit tous les rappels.
      */
     val workingStandbyDates: Set<String> = emptySet(),
+
+    /**
+     * Rappel, la veille au soir, de demander au responsable si l'on remplace quelqu'un.
+     * Le planning porte lui-même la consigne « à confirmer la veille » sur ces créneaux.
+     */
+    val standbyAskEnabled: Boolean = true,
+    /** Heure de la demande, la veille, en minutes depuis minuit. */
+    val standbyAskMinutes: Int = 18 * 60,
 
     /** Types de service explicitement mis en sourdine par l'utilisateur. */
     val disabledShiftTypes: Set<String> = emptySet(),

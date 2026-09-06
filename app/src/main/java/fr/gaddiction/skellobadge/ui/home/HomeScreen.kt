@@ -303,7 +303,9 @@ private fun DayCard(
                 is DayPlan.Work -> {
                     day.blocks.forEach { block -> BlockRow(block) }
 
-                    if (day.reminders.isEmpty()) {
+                    // Une journée de réserve n'a aucun rappel de badgeage ; la demande de
+                    // confirmation, elle, est portée par la veille.
+                    if (day.reminders.none { it.kind != ReminderKind.STANDBY_CONFIRM }) {
                         Text(
                             "Journée de réserve · aucun rappel",
                             style = MaterialTheme.typography.labelSmall,
@@ -337,16 +339,22 @@ private fun DayCard(
                                 }
                             }
                         }
-                        // Une journée coupée porte quatre rappels : sur un écran étroit ils
-                        // doivent pouvoir passer à la ligne plutôt que d'être tronqués.
-                        FlowRow(
-                            modifier = Modifier.padding(top = 10.dp),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            day.reminders.forEach { ReminderChip(it) }
-                        }
                     }
+                }
+            }
+
+            // Les rappels s'affichent quel que soit le type de journée : la demande de
+            // confirmation d'une réserve tombe la veille, qui est souvent un jour de repos.
+            //
+            // Une journée coupée en porte quatre : sur un écran étroit ils doivent pouvoir
+            // passer à la ligne plutôt que d'être tronqués.
+            if (day.reminders.isNotEmpty()) {
+                FlowRow(
+                    modifier = Modifier.padding(top = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    day.reminders.forEach { ReminderChip(it) }
                 }
             }
         }
@@ -457,6 +465,7 @@ private fun label(kind: ReminderKind): String = when (kind) {
     ReminderKind.BREAK_IN -> "Retour de pause"
     ReminderKind.SHIFT_CHANGE -> "Changement de poste"
     ReminderKind.CLOCK_OUT -> "Sortie"
+    ReminderKind.STANDBY_CONFIRM -> "Réserve à confirmer"
 }
 
 private fun shortLabel(kind: ReminderKind): String = when (kind) {
@@ -465,4 +474,5 @@ private fun shortLabel(kind: ReminderKind): String = when (kind) {
     ReminderKind.BREAK_IN -> "Retour"
     ReminderKind.SHIFT_CHANGE -> "Changement"
     ReminderKind.CLOCK_OUT -> "Sortie"
+    ReminderKind.STANDBY_CONFIRM -> "Demander"
 }

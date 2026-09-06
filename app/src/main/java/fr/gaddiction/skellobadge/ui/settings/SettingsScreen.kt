@@ -241,6 +241,50 @@ fun SettingsScreen(
             }
 
             Section(
+                title = "Réserve",
+                summary = if (settings.standbyAskEnabled) {
+                    "Demande la veille à " + formatMinutes(settings.standbyAskMinutes)
+                } else {
+                    "Sans demande la veille"
+                },
+            ) {
+                ListItem(
+                    headlineContent = { Text("Demander la veille") },
+                    supportingContent = {
+                        Text(
+                            "La veille d'une journée de réserve, un rappel te fait penser " +
+                                "à demander si tu remplaces quelqu'un.",
+                        )
+                    },
+                    trailingContent = {
+                        Switch(
+                            checked = settings.standbyAskEnabled,
+                            onCheckedChange = { checked ->
+                                haptics.toggle(checked)
+                                viewModel.update { it.copy(standbyAskEnabled = checked) }
+                            },
+                        )
+                    },
+                )
+
+                if (settings.standbyAskEnabled) {
+                    TimeField(
+                        label = "Heure de la demande",
+                        minutes = settings.standbyAskMinutes,
+                        haptics = haptics,
+                    ) { viewModel.update { s -> s.copy(standbyAskMinutes = it) } }
+
+                    Text(
+                        "Une seule demande par série : deux jours de réserve qui se suivent " +
+                            "relèvent du même remplacement, sauf si leurs descriptions " +
+                            "diffèrent au planning.",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                    )
+                }
+            }
+
+            Section(
                 title = "Texte des rappels",
                 summary = "Titre et texte de chaque type",
             ) {
@@ -636,6 +680,7 @@ private fun kindLabel(kind: ReminderKind): String = when (kind) {
     ReminderKind.BREAK_IN -> "Retour de pause"
     ReminderKind.SHIFT_CHANGE -> "Changement de poste"
     ReminderKind.CLOCK_OUT -> "Sortie"
+    ReminderKind.STANDBY_CONFIRM -> "Réserve à confirmer"
 }
 
 @Composable

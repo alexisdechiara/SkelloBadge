@@ -53,8 +53,74 @@ class PlanningEngineTest {
     @Test
     fun `parses every event and strips the Skello prefix`() {
         val parsed = events()
-        assertEquals(10, parsed.size)
+        assertEquals(14, parsed.size)
         assertTrue(parsed.none { it.title.startsWith("Shift:") })
+    }
+
+    private fun confirmationsOn(date: String, cfg: PlanningConfig = config): List<Reminder> =
+        day(date, cfg).reminders.filter { it.kind == ReminderKind.STANDBY_CONFIRM }
+
+    private fun allConfirmations(cfg: PlanningConfig = config): List<Reminder> =
+        days(cfg).flatMap { it.reminders }.filter { it.kind == ReminderKind.STANDBY_CONFIRM }
+
+    /**
+     * Une journée de réserve suppose de demander la veille au responsable si l'on remplace
+     * quelqu'un. Le planning porte lui-même la consigne sur ces créneaux.
+     */
+    @Test
+    fun `a standby day is asked about the evening before`() {
+        val reminders = confirmationsOn("2026-09-05")
+        assertEquals(1, reminders.size)
+        assertEquals(LocalTime.of(18, 0), at(reminders.single()))
+        assertEquals("EG ou Off", reminders.single().title)
+    }
+
+    /** La veille est ici un repos hebdomadaire : elle doit tout de même porter le rappel. */
+    @Test
+    fun `the question lands on a rest day when that is the eve`() {
+        assertTrue(day("2026-09-05") is DayPlan.Off)
+        assertEquals(1, confirmationsOn("2026-09-05").size)
+    }
+
+    /**
+     * Deux réserves qui se suivent relèvent du même remplacement quand leur description
+     * est identique : une seule demande, la veille du premier jour.
+     */
+    @Test
+    fun `consecutive standby days sharing a description are asked about once`() {
+        assertEquals(1, confirmationsOn("2026-09-16").size)
+        assertTrue(confirmationsOn("2026-09-17").isEmpty())
+    }
+
+    /** Descriptions différentes : deux remplacements distincts, donc deux demandes. */
+    @Test
+    fun `consecutive standby days with different descriptions are asked about separately`() {
+        assertEquals(1, confirmationsOn("2026-09-23").size)
+        assertEquals(1, confirmationsOn("2026-09-24").size)
+    }
+
+    @Test
+    fun `the sample yields exactly one question per standby run`() {
+        // 06/09 seul, 17-18/09 groupés, 24/09 et 25/09 séparés.
+        assertEquals(4, allConfirmations().size)
+    }
+
+    /** Une fois la journée déclarée travaillée, la question ne se pose plus. */
+    @Test
+    fun `declaring a standby day as worked removes its question`() {
+        val worked = config.copy(workingDates = setOf(LocalDate.parse("2026-09-06")))
+        assertTrue(confirmationsOn("2026-09-05", worked).isEmpty())
+    }
+
+    @Test
+    fun `the question disappears entirely when disabled`() {
+        assertTrue(allConfirmations(config.copy(standbyAskEnabled = false)).isEmpty())
+    }
+
+    /** Une démarche, pas un badgeage : elle ne doit pas s'ajouter aux rappels de la journée. */
+    @Test
+    fun `a standby day still carries no badging reminder of its own`() {
+        assertTrue(work("2026-09-06").reminders.isEmpty())
     }
 
     @Test

@@ -6,6 +6,7 @@ import android.net.Uri
 import fr.gaddiction.skellobadge.data.AppSettings
 import fr.gaddiction.skellobadge.data.BadgeTarget
 import fr.gaddiction.skellobadge.domain.Reminder
+import fr.gaddiction.skellobadge.domain.ReminderKind
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -68,6 +69,10 @@ object ReminderIntents {
         val wording = settings.wordingFor(reminder.kind)
         val time = TIME.format(reminder.actionAt)
 
+        // La demande de confirmation d'une réserve est une démarche, pas un badgeage :
+        // ni relance à la minute, ni alarme plein écran, et rien à ouvrir dans la badgeuse.
+        val isErrand = reminder.kind == ReminderKind.STANDBY_CONFIRM
+
         return Intent(context, ReminderReceiver::class.java).apply {
             action = ACTION_FIRE
             data = uriFor(reminder.id, attempt = 0)
@@ -79,14 +84,19 @@ object ReminderIntents {
             putExtra(EXTRA_NOTE, reminder.note)
             putExtra(EXTRA_ACTION_AT, reminder.actionAt.toInstant().toEpochMilli())
             putExtra(EXTRA_ATTEMPT, 0)
-            putExtra(EXTRA_NAG_INTERVAL, settings.nagIntervalMinutes)
+            putExtra(EXTRA_NAG_INTERVAL, if (isErrand) 0 else settings.nagIntervalMinutes)
             putExtra(EXTRA_NAG_MAX, settings.nagMaxCount)
-            putExtra(EXTRA_FULLSCREEN_ENABLED, settings.fullScreenAlarmEnabled)
+            putExtra(
+                EXTRA_FULLSCREEN_ENABLED,
+                !isErrand && settings.fullScreenAlarmEnabled,
+            )
             putExtra(EXTRA_FULLSCREEN_AFTER, settings.fullScreenAlarmAfterMinutes)
             putExtra(EXTRA_FORCE_FULLSCREEN, forceFullScreen)
-            when (settings.targetKind) {
-                BadgeTarget.APP -> putExtra(EXTRA_TARGET_PACKAGE, settings.targetPackage)
-                BadgeTarget.URL -> putExtra(EXTRA_TARGET_URL, settings.targetUrl)
+            if (!isErrand) {
+                when (settings.targetKind) {
+                    BadgeTarget.APP -> putExtra(EXTRA_TARGET_PACKAGE, settings.targetPackage)
+                    BadgeTarget.URL -> putExtra(EXTRA_TARGET_URL, settings.targetUrl)
+                }
             }
         }
     }
