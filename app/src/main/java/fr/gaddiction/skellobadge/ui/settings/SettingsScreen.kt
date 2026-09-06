@@ -3,10 +3,10 @@ package fr.gaddiction.skellobadge.ui.settings
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -49,6 +49,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fr.gaddiction.skellobadge.R
 import fr.gaddiction.skellobadge.data.AppSettings
 import fr.gaddiction.skellobadge.data.PlanningSource
+import fr.gaddiction.skellobadge.data.Wording
 import fr.gaddiction.skellobadge.domain.ReminderKind
 import fr.gaddiction.skellobadge.ui.AppViewModel
 import fr.gaddiction.skellobadge.ui.Haptics
@@ -162,7 +163,8 @@ fun SettingsScreen(
                     supportingContent = {
                         Text(
                             "Passé le délai, le rappel s'affiche par-dessus l'écran de " +
-                                "verrouillage, sonne en boucle et vibre jusqu'à ce qu'on y réponde.",
+                                "verrouillage, sonne en boucle et vibre jusqu'à ce que tu " +
+                                "y répondes.",
                         )
                     },
                     trailingContent = {
@@ -239,12 +241,17 @@ fun SettingsScreen(
             }
 
             Section(
-                title = "Formulation des rappels",
+                title = "Texte des rappels",
                 summary = "Titre et texte de chaque type",
             ) {
-                WordingEditor(settings, haptics) { kind, wording ->
-                    viewModel.update { it.copy(wording = it.wording + (kind to wording)) }
-                }
+                WordingEditor(
+                    settings = settings,
+                    haptics = haptics,
+                    onReset = { viewModel.update { it.copy(wording = Wording.DEFAULTS) } },
+                    onChange = { kind, wording ->
+                        viewModel.update { it.copy(wording = it.wording + (kind to wording)) }
+                    },
+                )
             }
 
             Section(
@@ -396,7 +403,7 @@ private fun TimeField(
                     haptics.confirm()
                     onChange(state.hour * 60 + state.minute)
                     open = false
-                }) { Text("Valider") }
+                }) { Text("Enregistrer l'heure") }
             },
             dismissButton = {
                 TextButton(onClick = { haptics.click(); open = false }) { Text("Annuler") }
@@ -427,8 +434,8 @@ private fun ServiceSelector(
 ) {
     if (types.isEmpty()) {
         Text(
-            "Aucun service lu pour l'instant.",
-            style = MaterialTheme.typography.bodySmall,
+            "Aucun service connu. La liste se remplira à la première synchronisation.",
+            style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
         )
         return
@@ -446,7 +453,11 @@ private fun ServiceSelector(
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(
-                active.toString() + " service(s) sur " + types.size + " déclenchent des rappels",
+                if (active <= 1) {
+                    active.toString() + " service sur " + types.size + " déclenche des rappels"
+                } else {
+                    active.toString() + " services sur " + types.size + " déclenchent des rappels"
+                },
                 modifier = Modifier.weight(1f),
                 textAlign = TextAlign.Start,
             )
@@ -457,11 +468,25 @@ private fun ServiceSelector(
         }
 
         // Le menu reste à hauteur constante et défile de lui-même : la liste peut grossir
-        // sans jamais repousser le reste des réglages hors de l'écran.
+        // sans jamais repousser le reste des réglages hors de l'écran. Les deux actions
+        // globales y figurent en tête plutôt qu'à l'extérieur : elles agissent sur les
+        // mêmes éléments, elles doivent vivre au même endroit.
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
         ) {
+            DropdownMenuItem(
+                text = { Text("Tout activer") },
+                enabled = active < types.size,
+                onClick = { haptics.confirm(); onAll(true) },
+            )
+            DropdownMenuItem(
+                text = { Text("Tout désactiver") },
+                enabled = active > 0,
+                onClick = { haptics.click(); onAll(false) },
+            )
+            HorizontalDivider()
+
             types.forEach { type ->
                 val checked = type !in disabled
                 DropdownMenuItem(
@@ -475,14 +500,6 @@ private fun ServiceSelector(
             }
         }
     }
-
-    Row(
-        modifier = Modifier.padding(horizontal = 20.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        TextButton(onClick = { haptics.confirm(); onAll(true) }) { Text("Tout activer") }
-        TextButton(onClick = { haptics.click(); onAll(false) }) { Text("Tout couper") }
-    }
 }
 
 /**
@@ -494,15 +511,21 @@ private fun ServiceSelector(
 private fun WordingEditor(
     settings: AppSettings,
     haptics: Haptics,
-    onChange: (ReminderKind, fr.gaddiction.skellobadge.data.Wording) -> Unit,
+    onReset: () -> Unit,
+    onChange: (ReminderKind, Wording) -> Unit,
 ) {
     var selected by remember { mutableStateOf(ReminderKind.CLOCK_IN) }
     val wording = settings.wordingFor(selected)
 
-    FlowRow(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+    // Une seule ligne qui déborde et défile, plutôt qu'un retour à la ligne : les cinq
+    // types gardent un ordre stable, et la hauteur du bloc ne change pas selon la largeur
+    // de l'écran ou la longueur des libellés.
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         ReminderKind.entries.forEach { kind ->
             FilterChip(
@@ -536,16 +559,26 @@ private fun WordingEditor(
             },
             modifier = Modifier.fillMaxWidth(),
         )
+
+        // Les textes sont enregistrés dès la première ouverture des réglages : sans ce
+        // bouton, une amélioration des formulations par défaut ne parviendrait jamais à
+        // qui a déjà installé l'application.
+        if (settings.wording != Wording.DEFAULTS) {
+            TextButton(onClick = { haptics.click(); onReset() }) {
+                Text("Rétablir les textes par défaut")
+            }
+        }
     }
 }
 
 private fun servicesSummary(types: List<String>, settings: AppSettings): String {
     if (types.isEmpty()) return "Aucun service connu"
     val muted = types.count { it in settings.disabledShiftTypes }
-    return if (muted == 0) {
-        types.size.toString() + " services, tous actifs"
-    } else {
-        types.size.toString() + " services, " + muted + " sans rappel"
+    val total = types.size.toString() + if (types.size <= 1) " service" else " services"
+    return when (muted) {
+        0 -> "$total, tous actifs"
+        1 -> "$total, 1 sans rappel"
+        else -> "$total, $muted sans rappel"
     }
 }
 
@@ -596,12 +629,13 @@ private fun Section(
     }
 }
 
+/** Mêmes termes que sur l'écran de planning et dans les canaux Android. */
 private fun kindLabel(kind: ReminderKind): String = when (kind) {
-    ReminderKind.CLOCK_IN -> "Arrivée"
+    ReminderKind.CLOCK_IN -> "Entrée"
     ReminderKind.BREAK_OUT -> "Départ en pause"
     ReminderKind.BREAK_IN -> "Retour de pause"
     ReminderKind.SHIFT_CHANGE -> "Changement de poste"
-    ReminderKind.CLOCK_OUT -> "Départ"
+    ReminderKind.CLOCK_OUT -> "Sortie"
 }
 
 @Composable

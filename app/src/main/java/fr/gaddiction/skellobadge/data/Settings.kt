@@ -32,22 +32,28 @@ data class Wording(val title: String, val body: String) {
         const val PLACEHOLDER_TIME = "{heure}"
         const val PLACEHOLDER_SHIFT = "{poste}"
 
-        /** Formulations par défaut, entièrement remplaçables depuis les réglages. */
+        /**
+         * Formulations par défaut, entièrement remplaçables depuis les réglages.
+         *
+         * Chaque titre désigne une action distincte. « Badge ta sortie » servait autrefois
+         * au départ en pause comme à la fin de poste : sur un écran verrouillé, à 12h05
+         * comme à 17h00, on lisait la même phrase au moment précis où il faut décider vite.
+         */
         val DEFAULTS: Map<ReminderKind, Wording> = mapOf(
             ReminderKind.CLOCK_IN to Wording(
                 "Badge ton entrée",
-                "Prise de poste à {heure} · {poste}",
+                "Entrée à {heure} · {poste}",
             ),
             ReminderKind.BREAK_OUT to Wording(
-                "Badge ta sortie",
+                "Badge ton départ en pause",
                 "Pause à partir de {heure}",
             ),
             ReminderKind.BREAK_IN to Wording(
-                "Badge ton retour",
+                "Badge ton retour de pause",
                 "Reprise à {heure} · {poste}",
             ),
             ReminderKind.SHIFT_CHANGE to Wording(
-                "Badge la bascule",
+                "Badge le changement de poste",
                 "À {heure} : {poste}",
             ),
             ReminderKind.CLOCK_OUT to Wording(

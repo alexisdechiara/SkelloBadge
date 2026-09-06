@@ -4,11 +4,15 @@
     <!-- Nom court, pour la barre de titre où le nom complet déborderait. -->
     <string name="app_name_short">Rappel Badgeuse</string>
 
-    <string name="channel_clock_in_name">Prise de poste</string>
+    <!--
+      Ces noms apparaissent dans les paramètres Android : ils reprennent mot pour mot le
+      vocabulaire de l’application, lui-même aligné sur celui de Skello — entrée, sortie.
+    -->
+    <string name="channel_clock_in_name">Entrée</string>
     <string name="channel_clock_in_desc">Rappel avant le début du service</string>
     <string name="channel_break_name">Pause</string>
-    <string name="channel_break_desc">Départ en pause et reprise</string>
-    <string name="channel_clock_out_name">Fin de poste</string>
+    <string name="channel_break_desc">Départ en pause et retour</string>
+    <string name="channel_clock_out_name">Sortie</string>
     <string name="channel_clock_out_desc">Rappel de badgeage en fin de service</string>
     <string name="channel_shift_change_name">Changement de poste</string>
     <string name="channel_shift_change_desc">Bascule entre deux services enchaînés</string>
@@ -19,7 +23,8 @@
 
     <!-- Le texte des rappels est modifiable dans les réglages ; seuls les préfixes
          d’escalade restent figés, car ils décrivent l’état et non le rappel. -->
-    <string name="notif_nag_prefix">Toujours pas badgé ?</string>
+    <!-- Une constatation, pas une question : la notification demande déjà une action. -->
+    <string name="notif_nag_prefix">Pas encore badgé ·</string>
     <string name="notif_late_prefix">Retard de %1$d min ·</string>
 
     <string name="notif_sync_error_title">Planning non récupéré</string>

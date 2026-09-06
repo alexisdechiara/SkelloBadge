@@ -212,7 +212,7 @@ private fun SourceStep(
 
             when (val result = check) {
                 AppViewModel.LinkCheck.Running -> Text(
-                    "Vérification en cours...",
+                    "Vérification…",
                     style = MaterialTheme.typography.bodyMedium,
                 )
 
@@ -223,11 +223,19 @@ private fun SourceStep(
                     color = MaterialTheme.colorScheme.primary,
                 )
 
-                is AppViewModel.LinkCheck.Failed -> Text(
-                    "Lien inutilisable : " + result.message,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error,
-                )
+                is AppViewModel.LinkCheck.Failed -> Column {
+                    Text(
+                        result.message,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                    // La cause technique reste consultable sans encombrer le message.
+                    Text(
+                        result.detail,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
 
                 AppViewModel.LinkCheck.Idle -> Unit
             }
@@ -273,7 +281,7 @@ private fun TargetStep(draft: AppSettings, onChange: (AppSettings) -> Unit) {
     val haptics = rememberHaptics()
 
     Text(
-        "Qu'ouvre-t-on quand tu touches la notification ?",
+        "Qu'est-ce qui s'ouvre quand tu touches la notification ?",
         style = MaterialTheme.typography.headlineSmall,
     )
 
@@ -313,7 +321,7 @@ private fun TargetStep(draft: AppSettings, onChange: (AppSettings) -> Unit) {
             if (filtered.isEmpty()) {
                 Text(
                     when {
-                        apps.isEmpty() -> "Lecture des applications installées..."
+                        apps.isEmpty() -> "Lecture des applications…"
                         else -> "Aucune application ne correspond. Efface la recherche " +
                             "pour voir la liste complète, ou choisis une adresse web."
                     },
@@ -368,7 +376,12 @@ private fun PermissionsStep() {
         ActivityResultContracts.RequestPermission(),
     ) { }
 
-    Text("Trois autorisations, une fois", style = MaterialTheme.typography.headlineSmall)
+    // Le nombre d'autorisations dépend de la version d'Android : annoncer un chiffre fixe
+    // reviendrait à en promettre trois à quelqu'un qui n'en verra qu'une.
+    Text(
+        "Quelques autorisations, une seule fois",
+        style = MaterialTheme.typography.headlineSmall,
+    )
 
     Text(
         "Les rappels doivent pouvoir sonner à l'heure exacte, y compris quand le " +

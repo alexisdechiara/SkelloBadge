@@ -145,9 +145,10 @@ private fun AlarmScreen(
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            // Capitales évitées : en français elles crient, et se passent mal des accents.
             Text(
-                "BADGEAGE EN RETARD",
-                style = MaterialTheme.typography.labelLarge,
+                "Badgeage en retard",
+                style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onErrorContainer,
             )
 
@@ -177,13 +178,16 @@ private fun AlarmScreen(
                 color = MaterialTheme.colorScheme.onErrorContainer,
             )
 
-            Spacer(Modifier.height(8.dp))
-
-            Text(
-                "Ignoré depuis " + payload.ignoredForMinutes + " min",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onErrorContainer,
-            )
+            // « Ignoré depuis 0 min » ne veut rien dire, et « ignoré » met en cause
+            // l'utilisateur là où l'application ne fait que constater.
+            if (payload.ignoredForMinutes >= 1) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Sans réponse depuis " + payload.ignoredForMinutes + " min",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                )
+            }
 
             Spacer(Modifier.height(48.dp))
 

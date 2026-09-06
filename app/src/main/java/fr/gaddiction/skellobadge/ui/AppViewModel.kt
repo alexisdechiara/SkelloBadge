@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import fr.gaddiction.skellobadge.data.AppSettings
+import fr.gaddiction.skellobadge.data.FetchErrors
 import fr.gaddiction.skellobadge.data.PlanningRepository
 import fr.gaddiction.skellobadge.data.SettingsRepository
 import fr.gaddiction.skellobadge.data.calendar.DeviceCalendarSource
@@ -61,7 +62,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         data object Idle : LinkCheck
         data object Running : LinkCheck
         data class Ok(val shifts: Int, val daysOff: Int) : LinkCheck
-        data class Failed(val message: String) : LinkCheck
+
+        /**
+         * [message] dit quoi faire ; [detail] conserve la cause technique, reléguée en
+         * petit. Un code HTTP seul n'apprend rien à qui vient de coller une adresse.
+         */
+        data class Failed(val message: String, val detail: String) : LinkCheck
     }
 
     private val _linkCheck = MutableStateFlow<LinkCheck>(LinkCheck.Idle)
@@ -117,10 +123,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
             _linkCheck.value = when {
                 payload.error != null && !payload.fromCache ->
-                    LinkCheck.Failed(payload.error)
+                    LinkCheck.Failed(FetchErrors.explain(payload.error), payload.error)
 
                 payload.body == null ->
-                    LinkCheck.Failed("Réponse vide")
+                    LinkCheck.Failed(
+                        "Skello a répondu, mais sans planning. Vérifie que l'adresse est " +
+                            "bien celle de l'abonnement au calendrier.",
+                        "réponse vide",
+                    )
 
                 else -> {
                     val events = IcsParser.parse(payload.body, zone).events

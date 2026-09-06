@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fr.gaddiction.skellobadge.R
 import fr.gaddiction.skellobadge.data.AppSettings
+import fr.gaddiction.skellobadge.data.FetchErrors
 import fr.gaddiction.skellobadge.domain.DayPlan
 import fr.gaddiction.skellobadge.domain.PlanningEngine
 import fr.gaddiction.skellobadge.domain.Reminder
@@ -99,11 +100,18 @@ fun HomeScreen(viewModel: AppViewModel, settings: AppSettings, onOpenSettings: (
 
                 if (days.isEmpty() && !loading) {
                     item {
-                        Text(
-                            "Aucun créneau trouvé sur les trois prochaines semaines.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(top = 12.dp),
-                        )
+                        Column(modifier = Modifier.padding(top = 12.dp)) {
+                            Text(
+                                "Rien au planning pour les trois prochaines semaines.",
+                                style = MaterialTheme.typography.titleSmall,
+                            )
+                            Text(
+                                "Si tu attendais des services, vérifie le lien du planning " +
+                                    "dans Réglages.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
 
@@ -166,8 +174,13 @@ private fun NextReminderCard(reminder: Reminder?, now: ZonedDateTime) {
             )
             if (reminder == null) {
                 Text(
-                    "Aucun rappel programmé",
+                    "Aucun rappel à venir",
                     style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+                Text(
+                    "Ils apparaîtront dès que ton planning contiendra un service.",
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
                 return@Card
@@ -208,17 +221,30 @@ private fun SyncWarningCard(error: String, fromCache: Boolean) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 if (fromCache) {
-                    "Planning non rafraîchi, dernière version connue utilisée"
+                    "Planning non rafraîchi"
                 } else {
-                    "Planning indisponible"
+                    "Planning non récupéré"
                 },
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onErrorContainer,
             )
             Text(
+                if (fromCache) {
+                    "Les rappels reposent sur la dernière version connue. " +
+                        FetchErrors.explain(error)
+                } else {
+                    "Aucun rappel ne sera posé tant que le planning reste inaccessible. " +
+                        FetchErrors.explain(error)
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+            )
+            // Cause technique, reléguée : utile pour diagnostiquer, inutile pour agir.
+            Text(
                 error,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.padding(top = 4.dp),
             )
         }
     }
@@ -420,18 +446,23 @@ private fun formatDuration(duration: Duration): String {
     return if (minutes == 0L) hours.toString() + " h" else hours.toString() + " h " + minutes
 }
 
+/**
+ * Vocabulaire unique dans toute l'application, aligné sur celui de Skello : entrée,
+ * sortie. La forme courte est une troncature de la longue, jamais un autre mot — sans
+ * quoi la même échéance porte quatre noms selon l'écran.
+ */
 private fun label(kind: ReminderKind): String = when (kind) {
-    ReminderKind.CLOCK_IN -> "Prise de poste"
+    ReminderKind.CLOCK_IN -> "Entrée"
     ReminderKind.BREAK_OUT -> "Départ en pause"
     ReminderKind.BREAK_IN -> "Retour de pause"
     ReminderKind.SHIFT_CHANGE -> "Changement de poste"
-    ReminderKind.CLOCK_OUT -> "Fin de poste"
+    ReminderKind.CLOCK_OUT -> "Sortie"
 }
 
 private fun shortLabel(kind: ReminderKind): String = when (kind) {
     ReminderKind.CLOCK_IN -> "Entrée"
     ReminderKind.BREAK_OUT -> "Pause"
     ReminderKind.BREAK_IN -> "Retour"
-    ReminderKind.SHIFT_CHANGE -> "Bascule"
+    ReminderKind.SHIFT_CHANGE -> "Changement"
     ReminderKind.CLOCK_OUT -> "Sortie"
 }
