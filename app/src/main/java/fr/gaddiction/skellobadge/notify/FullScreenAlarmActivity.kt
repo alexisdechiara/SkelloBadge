@@ -5,8 +5,6 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -17,16 +15,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
@@ -46,9 +44,6 @@ import java.util.Locale
  */
 class FullScreenAlarmActivity : ComponentActivity() {
 
-    private val signal by lazy { AlarmSignal(this) }
-    private val autoStop = Handler(Looper.getMainLooper())
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         showOverLockScreen()
@@ -59,10 +54,8 @@ class FullScreenAlarmActivity : ComponentActivity() {
             return
         }
 
-        signal.start()
-        // Filet de sécurité : si le téléphone reste hors de portée, on cesse de sonner
-        // au bout de quelques minutes plutôt que de vider la batterie. L'écran, lui, reste.
-        autoStop.postDelayed({ signal.stop() }, SOUND_TIMEOUT_MILLIS)
+        // Le son est lancé par le récepteur, pas ici : cet écran ne fait que l'arrêter.
+        // Ainsi l'alarme retentit même quand le système refuse l'affichage plein écran.
 
         setContent {
             SkelloBadgeTheme {
@@ -83,13 +76,12 @@ class FullScreenAlarmActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        autoStop.removeCallbacksAndMessages(null)
-        signal.stop()
+        AlarmSignal.stop()
         super.onDestroy()
     }
 
     private fun dismiss(id: Int) {
-        signal.stop()
+        AlarmSignal.stop()
         NotificationManagerCompat.from(this).cancel(id)
         AlarmScheduler(this).cancelChain(id)
     }
@@ -111,9 +103,6 @@ class FullScreenAlarmActivity : ComponentActivity() {
     companion object {
         private const val SCHEME = "skellobadge"
 
-        /** Au-delà, on arrête le son et la vibration ; l'écran d'alarme reste affiché. */
-        private const val SOUND_TIMEOUT_MILLIS = 5 * 60 * 1000L
-
         /** Reprend les extras du rappel pour que l'écran sache quoi afficher et quoi ouvrir. */
         fun intent(context: Context, source: Intent): Intent = Intent(source).apply {
             setClass(context, FullScreenAlarmActivity::class.java)
@@ -134,64 +123,66 @@ private fun AlarmScreen(
     onOpenBadge: () -> Unit,
     onDone: () -> Unit,
 ) {
+    val haptics = rememberHaptics()
+
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.errorContainer,
+        contentColor = MaterialTheme.colorScheme.onErrorContainer,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(32.dp),
-            verticalArrangement = Arrangement.Center,
+                .safeDrawingPadding()
+                .padding(horizontal = 28.dp, vertical = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            // L'information tient dans le tiers haut de l'écran : l'heure d'abord, parce
+            // que c'est elle qui dit s'il faut courir. Les actions restent en bas, sous
+            // le pouce, à une place stable d'une alarme à l'autre.
+            Spacer(Modifier.weight(0.6f))
+
             // Capitales évitées : en français elles crient, et se passent mal des accents.
             Text(
                 "Badgeage en retard",
                 style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onErrorContainer,
+            )
+
+            Spacer(Modifier.height(20.dp))
+
+            Text(
+                TIME.format(payload.actionAt),
+                style = MaterialTheme.typography.displayLarge,
+            )
+
+            Spacer(Modifier.height(4.dp))
+
+            Text(
+                payload.titleText,
+                style = MaterialTheme.typography.headlineSmall,
+                textAlign = TextAlign.Center,
             )
 
             Spacer(Modifier.height(12.dp))
 
             Text(
-                payload.titleText,
-                style = MaterialTheme.typography.displaySmall,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onErrorContainer,
-            )
-
-            Spacer(Modifier.height(16.dp))
-
-            Text(
-                TIME.format(payload.actionAt),
-                style = MaterialTheme.typography.displayLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onErrorContainer,
-            )
-
-            Text(
                 payload.shift,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onErrorContainer,
             )
 
-            // « Ignoré depuis 0 min » ne veut rien dire, et « ignoré » met en cause
+            // « Sans réponse depuis 0 min » ne veut rien dire, et « ignoré » met en cause
             // l'utilisateur là où l'application ne fait que constater.
             if (payload.ignoredForMinutes >= 1) {
                 Spacer(Modifier.height(8.dp))
                 Text(
                     "Sans réponse depuis " + payload.ignoredForMinutes + " min",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
                 )
             }
 
-            Spacer(Modifier.height(48.dp))
-
-            val haptics = rememberHaptics()
+            Spacer(Modifier.weight(1f))
 
             Button(
                 onClick = { haptics.confirm(); onOpenBadge() },
@@ -204,11 +195,16 @@ private fun AlarmScreen(
                 Text("Ouvrir la badgeuse", style = MaterialTheme.typography.titleLarge)
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(4.dp))
 
-            OutlinedButton(
+            // Sans bordure : c'est la sortie discrète, pas une seconde proposition de
+            // même poids que l'ouverture de la badgeuse.
+            TextButton(
                 onClick = { haptics.confirm(); onDone() },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                ),
             ) {
                 Text("J'ai déjà badgé", style = MaterialTheme.typography.titleMedium)
             }

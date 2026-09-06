@@ -14,6 +14,8 @@ class NotificationActionReceiver : BroadcastReceiver() {
         val id = intent.getIntExtra(ReminderIntents.EXTRA_ID, 0)
         if (id == 0) return
 
+        // Toute réponse fait taire l'alarme, d'où qu'elle vienne.
+        AlarmSignal.stop()
         NotificationManagerCompat.from(context).cancel(id)
         val scheduler = AlarmScheduler(context)
 

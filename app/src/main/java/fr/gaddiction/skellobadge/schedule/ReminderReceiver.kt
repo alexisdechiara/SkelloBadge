@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import fr.gaddiction.skellobadge.notify.AlarmSignal
 import fr.gaddiction.skellobadge.notify.FullScreenAlarmActivity
 import fr.gaddiction.skellobadge.notify.ReminderNotification
 import fr.gaddiction.skellobadge.notify.ReminderPayload
@@ -23,6 +24,12 @@ class ReminderReceiver : BroadcastReceiver() {
         val payload = ReminderPayload.from(intent) ?: run {
             Log.w(TAG, "Alarme recue sans charge utile exploitable")
             return
+        }
+
+        // Le signal sonore appartient au processus, non à l'écran d'alarme : il retentit
+        // même si le système refuse l'affichage plein écran.
+        if (payload.shouldEscalate) {
+            AlarmSignal.start(context)
         }
 
         ReminderNotification.post(context, payload, intent)

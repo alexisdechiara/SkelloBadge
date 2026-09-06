@@ -3,8 +3,6 @@ package fr.gaddiction.skellobadge.notify
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
-import android.media.AudioAttributes
-import android.media.RingtoneManager
 import androidx.core.content.getSystemService
 import fr.gaddiction.skellobadge.R
 import fr.gaddiction.skellobadge.domain.ReminderKind
@@ -85,9 +83,11 @@ object Notifications {
     }
 
     /**
-     * Canal de l'escalade. Il utilise le son et le flux audio des alarmes plutôt que ceux
-     * des notifications : c'est ce qui le rend audible quand le téléphone est en sourdine,
-     * et ce qui distingue un badgeage en retard d'une notification ordinaire.
+     * Canal de l'escalade, volontairement muet et sans vibration.
+     *
+     * Le son et la vibration sont pilotés par [AlarmSignal], qui les joue en boucle
+     * jusqu'à réponse. Les déclarer aussi sur le canal les faisait retentir deux fois,
+     * avec un léger décalage : un écho à l'oreille, et une vibration doublée.
      */
     private fun alarmChannel(context: Context): NotificationChannel =
         NotificationChannel(
@@ -96,16 +96,9 @@ object Notifications {
             NotificationManager.IMPORTANCE_HIGH,
         ).apply {
             description = context.getString(R.string.channel_alarm_desc)
-            enableVibration(true)
-            vibrationPattern = longArrayOf(0, 500, 300, 500, 300, 500)
+            enableVibration(false)
             setShowBadge(true)
-            setSound(
-                RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM),
-                AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_ALARM)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                    .build(),
-            )
+            setSound(null, null)
         }
 
     private fun channel(

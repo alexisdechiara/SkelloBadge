@@ -1,6 +1,7 @@
 package fr.gaddiction.skellobadge.notify
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
@@ -16,6 +17,8 @@ import fr.gaddiction.skellobadge.schedule.ReminderIntents
 
 object ReminderNotification {
 
+    // La permission est vérifiée juste en dessous, par une voie que lint ne suit pas.
+    @SuppressLint("MissingPermission")
     fun post(context: Context, payload: ReminderPayload, source: Intent) {
         if (!canPost(context)) return
         NotificationManagerCompat.from(context)
