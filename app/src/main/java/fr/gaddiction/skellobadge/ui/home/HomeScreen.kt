@@ -46,13 +46,17 @@ import fr.gaddiction.skellobadge.data.AppSettings
 import fr.gaddiction.skellobadge.data.Contacts
 import fr.gaddiction.skellobadge.data.FetchErrors
 import fr.gaddiction.skellobadge.data.UpdateChecker
+import fr.gaddiction.skellobadge.data.UpdateInstaller
 import fr.gaddiction.skellobadge.domain.DayPlan
 import fr.gaddiction.skellobadge.domain.Pause
 import fr.gaddiction.skellobadge.domain.PlanningEngine
 import fr.gaddiction.skellobadge.domain.Reminder
+import fr.gaddiction.skellobadge.domain.ReleaseNotes
 import fr.gaddiction.skellobadge.domain.ReminderKind
 import fr.gaddiction.skellobadge.domain.WorkBlock
 import fr.gaddiction.skellobadge.ui.AppViewModel
+import fr.gaddiction.skellobadge.ui.ReleaseNotesList
+import fr.gaddiction.skellobadge.ui.UpdateInstallPanel
 import fr.gaddiction.skellobadge.ui.rememberHaptics
 import java.time.DayOfWeek
 import java.time.Duration
@@ -77,6 +81,7 @@ fun HomeScreen(viewModel: AppViewModel, settings: AppSettings, onOpenSettings: (
     val planning by viewModel.planning.collectAsStateWithLifecycle()
     val loading by viewModel.loading.collectAsStateWithLifecycle()
     val update by viewModel.update.collectAsStateWithLifecycle()
+    val install by viewModel.install.collectAsStateWithLifecycle()
     val haptics = rememberHaptics()
     val context = LocalContext.current
 
@@ -122,6 +127,13 @@ fun HomeScreen(viewModel: AppViewModel, settings: AppSettings, onOpenSettings: (
                         item(key = "update") {
                             UpdateCard(
                                 available = available,
+                                installState = install,
+                                onInstall = { viewModel.installUpdate(available.release) },
+                                onAllow = {
+                                    runCatching {
+                                        context.startActivity(viewModel.installPermissionIntent())
+                                    }
+                                },
                                 onOpen = { url ->
                                     runCatching {
                                         context.startActivity(UpdateChecker.downloadIntent(url))
@@ -255,16 +267,27 @@ private fun NextReminderCard(reminder: Reminder?, now: ZonedDateTime) {
 }
 
 /**
- * Annonce d'une nouvelle version. « Plus tard » l'écarte pour de bon : la bannière ne
- * revient qu'avec la version suivante, plutôt qu'à chaque ouverture.
+ * Annonce d'une nouvelle version, installable sans quitter l'application.
+ *
+ * « Plus tard » l'écarte pour de bon : la bannière ne revient qu'avec la version
+ * suivante, plutôt qu'à chaque ouverture. « Nouveautés » déplie les notes sur place ;
+ * faute de notes rédigées, il renvoie à la page de la version.
  */
 @Composable
 private fun UpdateCard(
     available: UpdateChecker.Result.Available,
+    installState: UpdateInstaller.State,
+    onInstall: () -> Unit,
+    onAllow: () -> Unit,
     onOpen: (String) -> Unit,
     onLater: () -> Unit,
 ) {
     val haptics = rememberHaptics()
+    val release = available.release
+    val hasNotes = ReleaseNotes.hasContent(release.notes)
+    var notesOpen by rememberSaveable(release.version) { mutableStateOf(false) }
+    val textColor = MaterialTheme.colorScheme.onTertiaryContainer
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -273,34 +296,46 @@ private fun UpdateCard(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                "Version " + available.release.version + " disponible",
+                "Version " + release.version + " disponible",
                 style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                color = textColor,
             )
             Text(
                 (available.installed.takeIf(String::isNotBlank)?.let { "Tu as la $it. " } ?: "") +
                     "La mise à jour s'installe par-dessus, sans perdre ta configuration.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                color = textColor,
             )
-            // Trois actions ne tiennent pas sur une ligne d'écran étroit : elles passent à
-            // la ligne plutôt que d'être tronquées.
-            FlowRow(
-                modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+
+            if (notesOpen) ReleaseNotesList(release.notes, textColor)
+
+            UpdateInstallPanel(
+                release = release,
+                state = installState,
+                textColor = textColor,
+                haptics = haptics,
+                onInstall = onInstall,
+                onAllow = onAllow,
+                onBrowser = { onOpen(release.downloadUrl) },
+                buttonColors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.tertiary,
+                    contentColor = MaterialTheme.colorScheme.onTertiary,
+                ),
             ) {
-                Button(
-                    onClick = { haptics.confirm(); onOpen(available.release.downloadUrl) },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.tertiary,
-                        contentColor = MaterialTheme.colorScheme.onTertiary,
-                    ),
-                ) { Text("Mettre à jour") }
-                TextButton(onClick = { haptics.click(); onOpen(available.release.pageUrl) }) {
-                    Text("Nouveautés", color = MaterialTheme.colorScheme.onTertiaryContainer)
+                TextButton(
+                    onClick = {
+                        haptics.click()
+                        if (hasNotes) notesOpen = !notesOpen else onOpen(release.pageUrl)
+                    },
+                ) {
+                    Text(if (notesOpen) "Masquer" else "Nouveautés", color = textColor)
                 }
-                TextButton(onClick = { haptics.click(); onLater() }) {
-                    Text("Plus tard", color = MaterialTheme.colorScheme.onTertiaryContainer)
+                val busy = installState is UpdateInstaller.State.Downloading ||
+                    installState == UpdateInstaller.State.Installing
+                if (!busy) {
+                    TextButton(onClick = { haptics.click(); onLater() }) {
+                        Text("Plus tard", color = textColor)
+                    }
                 }
             }
         }

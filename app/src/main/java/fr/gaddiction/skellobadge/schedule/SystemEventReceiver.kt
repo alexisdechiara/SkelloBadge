@@ -4,6 +4,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import fr.gaddiction.skellobadge.data.UpdateInstaller
+import fr.gaddiction.skellobadge.notify.UpdateNotification
 
 /**
  * Les alarmes exactes sont perdues au redémarrage, lors d'un changement d'heure ou de
@@ -24,6 +26,13 @@ class SystemEventReceiver : BroadcastReceiver() {
                 Log.i(TAG, "Replanification declenchee par " + intent.action)
                 RefreshWorker.enqueuePeriodic(context)
                 RefreshWorker.refreshNow(context)
+
+                // La mise à jour vient d'aboutir : son annonce et l'APK téléchargé n'ont
+                // plus lieu d'être.
+                if (intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
+                    UpdateNotification.cancel(context)
+                    UpdateInstaller.cleanUp(context)
+                }
             }
         }
     }

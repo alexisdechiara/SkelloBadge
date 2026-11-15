@@ -35,7 +35,7 @@
     <string name="notif_sync_error_text">Rien de neuf depuis %1$s. Les rappels reposent sur la dernière version connue.</string>
 
     <string name="notif_update_title">Version %1$s disponible</string>
-    <string name="notif_update_text">Tu utilises la %1$s. Touche pour télécharger la mise à jour : la configuration est conservée.</string>
+    <string name="notif_update_text">Tu utilises la %1$s. Touche pour l’installer depuis l’application : la configuration est conservée.</string>
 
     <string name="action_badged">J’ai badgé</string>
     <string name="action_snooze">Dans 5 min</string>

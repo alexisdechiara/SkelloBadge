@@ -28,6 +28,13 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <!--
+      Installation des mises à jour publiées sur GitHub, depuis l'application elle-même.
+      Android la soumet à une autorisation que l'utilisateur accorde une fois, et demande
+      de toute façon confirmation à chaque installation.
+    -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <!--
       Alarme plein écran par-dessus l'écran de verrouillage quand un badgeage reste ignoré.
       Accordée d'office jusqu'à Android 13 ; à partir d'Android 14 elle est réservée aux
       applications d'appel et de réveil, et doit être accordée explicitement — ce que
@@ -102,6 +109,11 @@
         <!-- Déclenché par AlarmManager via un PendingIntent de l'application elle-même. -->
         <receiver
             android:name=".schedule.ReminderReceiver"
+            android:exported="false" />
+
+        <!-- Issue d'une installation de mise à jour, relayée par l'installateur d'Android. -->
+        <receiver
+            android:name=".data.UpdateInstallReceiver"
             android:exported="false" />
 
         <!-- Actions « J'ai badgé » et « Dans 5 min » portées par les notifications. -->

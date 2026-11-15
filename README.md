@@ -20,11 +20,20 @@ L'application vérifie elle-même, une fois par jour, si une version plus récen
 publiée dans les [releases](https://github.com/alexisdechiara/SkelloBadge/releases) :
 
 - une **notification discrète** (canal « Nouvelle version », sans son) l'annonce une seule
-  fois ; la toucher télécharge l'APK, qu'Android propose ensuite d'installer ;
-- une **bannière** sur l'écran d'accueil propose *Mettre à jour*, *Nouveautés* ou
-  *Plus tard* — qui écarte cette version, la suivante sera de nouveau proposée ;
-- la section **Mises à jour** des réglages affiche la version installée, permet de
-  couper la vérification automatique et de lancer une recherche à la demande.
+  fois, et ouvre l'application ;
+- une **bannière** sur l'écran d'accueil propose *Mettre à jour*, *Nouveautés* — les notes
+  de la version, dépliées sur place — ou *Plus tard*, qui écarte cette version jusqu'à la
+  suivante ;
+- la section **Mises à jour** des réglages affiche la version installée, les nouveautés,
+  permet de couper la vérification automatique et de lancer une recherche à la demande.
+
+*Mettre à jour* télécharge l'APK dans l'application, avec sa progression, puis le confie
+à l'installateur d'Android : il n'y a qu'à confirmer. La première fois, Android demande
+d'autoriser l'application à installer ses mises à jour ; au retour de cet écran, le
+téléchargement démarre de lui-même. Avant toute installation, la taille et l'empreinte
+SHA-256 du fichier reçu sont comparées à celles que publie GitHub ; Android refuse de
+son côté toute version signée d'une autre clé. En cas d'échec, un bouton propose de
+passer par le navigateur.
 
 Seules les releases publiées comptent : brouillons et préversions ne sont jamais
 proposés. La comparaison est numérique (`1.10.0` est plus récent que `1.9.0`). La
@@ -210,11 +219,19 @@ pas mettre à jour une installation signée avec la vraie clé.
 
 ## Publier une version
 
-Une étiquette suffit :
+Deux temps : rédiger les nouveautés, puis étiqueter.
 
-```bash
-git tag v1.1.0 && git push origin v1.1.0
-```
+1. Ajouter en tête de [`CHANGELOG.md`](CHANGELOG.md) une section `## 1.2.0` décrivant, pour
+   qui utilise l'application, ce qui change. Elle devient la description de la release
+   et s'affiche dans l'application sous *Nouveautés*.
+2. Étiqueter :
+
+   ```bash
+   git tag v1.2.0 && git push origin v1.2.0
+   ```
+
+Si la section manque, la publication échoue dès sa première étape, avant toute
+compilation, en disant laquelle ajouter.
 
 Le workflow `Publication` compile, vérifie la signature et crée la release GitHub avec
 l'APK en pièce jointe. La clé de signature n'est pas lue depuis le disque mais depuis

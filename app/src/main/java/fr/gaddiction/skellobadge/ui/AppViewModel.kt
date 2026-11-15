@@ -8,6 +8,7 @@ import fr.gaddiction.skellobadge.data.FetchErrors
 import fr.gaddiction.skellobadge.data.PlanningRepository
 import fr.gaddiction.skellobadge.data.SettingsRepository
 import fr.gaddiction.skellobadge.data.UpdateChecker
+import fr.gaddiction.skellobadge.data.UpdateInstaller
 import fr.gaddiction.skellobadge.data.calendar.DeviceCalendarSource
 import fr.gaddiction.skellobadge.data.ics.IcsFetcher
 import fr.gaddiction.skellobadge.data.ics.IcsParser
@@ -114,6 +115,58 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 UpdateNotification.cancel(getApplication())
             }
         }
+    }
+
+    private val installer = UpdateInstaller(application)
+
+    /** Avancement de l'installation : partagé avec le récepteur qui en reçoit l'issue. */
+    val install: StateFlow<UpdateInstaller.State> = UpdateInstaller.state
+
+    /** Écran système où autoriser l'installation des mises à jour. */
+    fun installPermissionIntent() = installer.permissionIntent()
+
+    /**
+     * Télécharge la version, la vérifie et la confie à Android.
+     *
+     * Sans l'autorisation d'installer, l'état passe à [UpdateInstaller.State.NeedsPermission]
+     * et l'écran ouvre les paramètres ; au retour dans l'application, [resumeInstall]
+     * reprend là où l'on s'était arrêté, sans qu'il faille retoucher le bouton.
+     */
+    fun installUpdate(release: UpdateChecker.Release) {
+        when (install.value) {
+            is UpdateInstaller.State.Downloading, UpdateInstaller.State.Installing -> return
+            else -> Unit
+        }
+        if (!installer.canInstall()) {
+            UpdateInstaller.report(UpdateInstaller.State.NeedsPermission(release))
+            return
+        }
+        viewModelScope.launch {
+            UpdateInstaller.report(UpdateInstaller.State.Downloading(0f))
+            try {
+                val apk = installer.download(release) { progress ->
+                    UpdateInstaller.report(UpdateInstaller.State.Downloading(progress))
+                }
+                installer.install(apk)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                UpdateInstaller.report(UpdateInstaller.State.Idle)
+                throw cancelled
+            } catch (t: Throwable) {
+                UpdateInstaller.report(
+                    UpdateInstaller.State.Failed(t.message ?: "Téléchargement impossible"),
+                )
+            }
+        }
+    }
+
+    /** Retour des paramètres système : l'autorisation vient peut-être d'être accordée. */
+    fun resumeInstall() {
+        val pending = install.value as? UpdateInstaller.State.NeedsPermission ?: return
+        if (installer.canInstall()) installUpdate(pending.release)
+    }
+
+    fun resetInstall() {
+        UpdateInstaller.report(UpdateInstaller.State.Idle)
     }
 
     /** « Plus tard » : cette version ne sera plus proposée, la suivante le sera. */

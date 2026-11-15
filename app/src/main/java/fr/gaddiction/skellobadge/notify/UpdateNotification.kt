@@ -3,8 +3,10 @@ package fr.gaddiction.skellobadge.notify
 import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import fr.gaddiction.skellobadge.MainActivity
 import fr.gaddiction.skellobadge.R
 import fr.gaddiction.skellobadge.data.SettingsRepository
 import fr.gaddiction.skellobadge.data.UpdateChecker
@@ -75,18 +77,20 @@ object UpdateNotification {
             .setCategory(NotificationCompat.CATEGORY_RECOMMENDATION)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setAutoCancel(true)
-            // Un toucher suffit : l'APK se télécharge et Android propose de l'installer.
-            .setContentIntent(download(context, result.release.downloadUrl))
+            // L'accueil porte la bannière : un geste de plus y installe la version, avec
+            // la progression du téléchargement et les nouveautés sous les yeux.
+            .setContentIntent(openApp(context))
             .build()
         NotificationManagerCompat.from(context)
             .notify(Notifications.NOTIFICATION_ID_UPDATE, notification)
     }
 
-    private fun download(context: Context, url: String): PendingIntent =
+    private fun openApp(context: Context): PendingIntent =
         PendingIntent.getActivity(
             context,
             Notifications.NOTIFICATION_ID_UPDATE,
-            UpdateChecker.downloadIntent(url),
+            Intent(context, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 }

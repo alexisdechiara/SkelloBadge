@@ -55,10 +55,14 @@ import fr.gaddiction.skellobadge.data.AppSettings
 import fr.gaddiction.skellobadge.data.Contacts
 import fr.gaddiction.skellobadge.data.PlanningSource
 import fr.gaddiction.skellobadge.data.UpdateChecker
+import fr.gaddiction.skellobadge.data.UpdateInstaller
 import fr.gaddiction.skellobadge.data.Wording
+import fr.gaddiction.skellobadge.domain.ReleaseNotes
 import fr.gaddiction.skellobadge.domain.ReminderKind
 import fr.gaddiction.skellobadge.ui.AppViewModel
 import fr.gaddiction.skellobadge.ui.Haptics
+import fr.gaddiction.skellobadge.ui.ReleaseNotesList
+import fr.gaddiction.skellobadge.ui.UpdateInstallPanel
 import fr.gaddiction.skellobadge.ui.rememberHaptics
 import java.time.Instant
 import java.time.ZoneId
@@ -76,6 +80,7 @@ fun SettingsScreen(
 ) {
     val fromPlanning by viewModel.shiftTypes.collectAsStateWithLifecycle()
     val update by viewModel.update.collectAsStateWithLifecycle()
+    val install by viewModel.install.collectAsStateWithLifecycle()
     val haptics = rememberHaptics()
     val context = LocalContext.current
 
@@ -453,8 +458,13 @@ fun SettingsScreen(
 
                 UpdateStatus(
                     state = update,
+                    installState = install,
                     haptics = haptics,
                     onCheck = { viewModel.checkForUpdate(manual = true) },
+                    onInstall = viewModel::installUpdate,
+                    onAllow = {
+                        runCatching { context.startActivity(viewModel.installPermissionIntent()) }
+                    },
                     onOpen = { url ->
                         runCatching { context.startActivity(UpdateChecker.downloadIntent(url)) }
                     },
@@ -609,8 +619,11 @@ private fun TimeField(
 @Composable
 private fun UpdateStatus(
     state: AppViewModel.UpdateState,
+    installState: UpdateInstaller.State,
     haptics: Haptics,
     onCheck: () -> Unit,
+    onInstall: (UpdateChecker.Release) -> Unit,
+    onAllow: () -> Unit,
     onOpen: (String) -> Unit,
 ) {
     val result = (state as? AppViewModel.UpdateState.Done)?.result
@@ -637,14 +650,25 @@ private fun UpdateStatus(
     }
 
     if (result is UpdateChecker.Result.Available) {
-        FilledTonalButton(
-            onClick = { haptics.confirm(); onOpen(result.release.downloadUrl) },
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp),
-        ) { Text("Télécharger la version " + result.release.version) }
-        TextButton(
-            onClick = { haptics.click(); onOpen(result.release.pageUrl) },
-            modifier = Modifier.padding(horizontal = 12.dp),
-        ) { Text("Voir les nouveautés") }
+        val release = result.release
+        Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+            if (ReleaseNotes.hasContent(release.notes)) {
+                ReleaseNotesList(release.notes, MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            UpdateInstallPanel(
+                release = release,
+                state = installState,
+                textColor = MaterialTheme.colorScheme.onSurface,
+                haptics = haptics,
+                onInstall = { onInstall(release) },
+                onAllow = onAllow,
+                onBrowser = { onOpen(release.downloadUrl) },
+            ) {
+                TextButton(onClick = { haptics.click(); onOpen(release.pageUrl) }) {
+                    Text("Page de la version")
+                }
+            }
+        }
     } else {
         OutlinedButton(
             onClick = { haptics.click(); onCheck() },

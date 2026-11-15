@@ -29,7 +29,13 @@ class UpdateChecker(private val context: Context) {
         val pageUrl: String,
         /** Lien direct vers l'APK joint à la release, s'il y en a un. */
         val apkUrl: String?,
-        /** Notes de version, telles que générées par GitHub. */
+        /**
+         * Taille et empreinte SHA-256 annoncées par GitHub pour l'APK. Elles permettent de
+         * refuser un téléchargement tronqué ou altéré avant même de le proposer à Android.
+         */
+        val apkSize: Long? = null,
+        val apkSha256: String? = null,
+        /** Notes de version, rédigées dans CHANGELOG.md et reprises par la publication. */
         val notes: String,
     ) {
         /** Ce qu'ouvre « Mettre à jour » : l'APK de préférence, la page sinon. */
@@ -78,13 +84,17 @@ class UpdateChecker(private val context: Context) {
             (0 until list.length())
                 .map(list::getJSONObject)
                 .firstOrNull { it.optString("name").endsWith(".apk", ignoreCase = true) }
-                ?.optString("browser_download_url")
-                ?.takeIf(String::isNotBlank)
         }
         return Release(
             version = tag.removePrefix("v").removePrefix("V"),
             pageUrl = root.optString("html_url").ifBlank { RELEASES_PAGE_URL },
-            apkUrl = apk,
+            apkUrl = apk?.optString("browser_download_url")?.takeIf(String::isNotBlank),
+            apkSize = apk?.optLong("size")?.takeIf { it > 0 },
+            // Forme « sha256:<hex> » ; absente des releases anciennes.
+            apkSha256 = apk?.optString("digest")
+                ?.takeIf { it.startsWith("sha256:", ignoreCase = true) }
+                ?.substringAfter(':')
+                ?.lowercase(),
             notes = root.optString("body").trim(),
         )
     }

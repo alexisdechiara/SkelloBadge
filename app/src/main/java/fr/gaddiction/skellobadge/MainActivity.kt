@@ -53,6 +53,7 @@ class MainActivity : ComponentActivity() {
         super.onStart()
         viewModel.refresh()
         viewModel.checkForUpdate()
+        viewModel.resumeInstall()
     }
 }
 
