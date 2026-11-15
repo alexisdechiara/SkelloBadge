@@ -1,6 +1,7 @@
 package fr.gaddiction.skellobadge.ui.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +18,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -26,11 +28,17 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fr.gaddiction.skellobadge.R
@@ -38,6 +46,7 @@ import fr.gaddiction.skellobadge.data.AppSettings
 import fr.gaddiction.skellobadge.data.Contacts
 import fr.gaddiction.skellobadge.data.FetchErrors
 import fr.gaddiction.skellobadge.domain.DayPlan
+import fr.gaddiction.skellobadge.domain.Pause
 import fr.gaddiction.skellobadge.domain.PlanningEngine
 import fr.gaddiction.skellobadge.domain.Reminder
 import fr.gaddiction.skellobadge.domain.ReminderKind
@@ -406,33 +415,102 @@ private fun DayCard(
 }
 
 /**
- * Une ligne par créneau. La note du planning n'y figure pas : elle atteint parfois dix
- * lignes de consignes et de prénoms, ce qui noyait la journée. Elle reste là où elle est
- * utile, dans la notification du moment venu.
+ * Une ligne par créneau, suivie de ce que le planning ne montre pas : la pause prise à
+ * l'intérieur, avec sa provenance, et la note du responsable.
+ *
+ * La note atteint parfois dix lignes de consignes et de prénoms, ce qui noyait la journée
+ * quand elle s'affichait en entier. Elle tient donc sur une ligne, et se déplie au toucher.
  */
 @Composable
 private fun BlockRow(block: WorkBlock) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.padding(top = 6.dp),
-    ) {
-        Text(
-            TIME.format(block.start) + " – " + TIME.format(block.end),
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = if (block.notifies) {
-                MaterialTheme.colorScheme.onSurface
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-        )
-        Text(
-            "  " + block.title,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+    Column(modifier = Modifier.padding(top = 6.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                TIME.format(block.start) + " – " + TIME.format(block.end),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = if (block.notifies) {
+                    MaterialTheme.colorScheme.onSurface
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            )
+            Text(
+                "  " + block.title,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        block.pause?.let { PauseLine(it) }
+        block.note?.takeIf(String::isNotBlank)?.let { NoteLine(it) }
     }
 }
+
+/**
+ * La provenance compte autant que l'heure : une pause lue dans la note se vérifie d'un
+ * coup d'œil, une pause par défaut invite à regarder si la note n'en dit pas plus.
+ */
+@Composable
+private fun PauseLine(pause: Pause) {
+    val origin = when (pause.origin) {
+        Pause.Origin.NOTE -> "lue dans la note"
+        Pause.Origin.NOTE_GAP -> "entre deux activités de la note"
+        Pause.Origin.DEFAULT -> "horaire par défaut"
+    }
+    Text(
+        "Pause " + TIME.format(pause.start) + " – " + TIME.format(pause.end) + " · " + origin,
+        style = MaterialTheme.typography.bodySmall,
+        color = if (pause.origin == Pause.Origin.DEFAULT) {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        } else {
+            MaterialTheme.colorScheme.tertiary
+        },
+        modifier = Modifier.padding(top = 2.dp),
+    )
+}
+
+@Composable
+private fun NoteLine(note: String) {
+    var open by rememberSaveable(note) { mutableStateOf(false) }
+    val haptics = rememberHaptics()
+    val firstLine = note.lineSequence().map(String::trim).first(String::isNotEmpty)
+    val multiline = note.trim() != firstLine
+
+    Row(
+        verticalAlignment = Alignment.Top,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClickLabel = if (open) "Replier la note" else "Déplier la note") {
+                haptics.click()
+                open = !open
+            }
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+    ) {
+        Text(
+            if (open) note.trim() else firstLine,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = if (open) Int.MAX_VALUE else 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        // Le chevron ne promet un dépliage que s'il y a quelque chose à déplier.
+        if (multiline || firstLine.length > NOTE_PREVIEW_HINT) {
+            Icon(
+                painter = painterResource(R.drawable.ic_chevron_down),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 4.dp).rotate(if (open) 180f else 0f),
+            )
+        }
+    }
+}
+
+/** Au-delà, une note d'une seule ligne risque d'être tronquée sur un écran étroit. */
+private const val NOTE_PREVIEW_HINT = 40
 
 @Composable
 private fun HoursBadge(blocks: List<WorkBlock>) {

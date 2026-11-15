@@ -52,6 +52,8 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.LUNCH_FALLBACK] = updated.lunchFallbackEnabled
             prefs[Keys.LUNCH_START] = updated.lunchStartMinutes
             prefs[Keys.LUNCH_END] = updated.lunchEndMinutes
+            prefs[Keys.NOTE_PAUSE] = updated.notePauseEnabled
+            prefs[Keys.NOTE_PAUSE_KEYWORDS] = updated.notePauseKeywords
             prefs[Keys.STANDBY_PATTERNS] = updated.standbyPatterns
             prefs[Keys.STANDBY_ASK] = updated.standbyAskEnabled
             prefs[Keys.ASK_WORKING] = updated.askWorkingMinutes
@@ -105,6 +107,8 @@ class SettingsRepository(private val context: Context) {
             lunchFallbackEnabled = prefs[Keys.LUNCH_FALLBACK] ?: defaults.lunchFallbackEnabled,
             lunchStartMinutes = prefs[Keys.LUNCH_START] ?: defaults.lunchStartMinutes,
             lunchEndMinutes = prefs[Keys.LUNCH_END] ?: defaults.lunchEndMinutes,
+            notePauseEnabled = prefs[Keys.NOTE_PAUSE] ?: defaults.notePauseEnabled,
+            notePauseKeywords = prefs[Keys.NOTE_PAUSE_KEYWORDS] ?: defaults.notePauseKeywords,
             standbyPatterns = prefs[Keys.STANDBY_PATTERNS] ?: defaults.standbyPatterns,
             standbyAskEnabled = prefs[Keys.STANDBY_ASK] ?: defaults.standbyAskEnabled,
             askWorkingMinutes = prefs[Keys.ASK_WORKING] ?: defaults.askWorkingMinutes,
@@ -154,6 +158,8 @@ class SettingsRepository(private val context: Context) {
         val LUNCH_FALLBACK = booleanPreferencesKey("lunch_fallback")
         val LUNCH_START = intPreferencesKey("lunch_start_minutes")
         val LUNCH_END = intPreferencesKey("lunch_end_minutes")
+        val NOTE_PAUSE = booleanPreferencesKey("note_pause")
+        val NOTE_PAUSE_KEYWORDS = stringSetPreferencesKey("note_pause_keywords")
         val STANDBY_PATTERNS = stringSetPreferencesKey("standby_patterns")
         val STANDBY_ASK = booleanPreferencesKey("standby_ask")
         val ASK_WORKING = intPreferencesKey("ask_working_minutes")

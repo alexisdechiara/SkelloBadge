@@ -69,6 +69,11 @@ data class WorkBlock(
      * ses horaires, mais ne produit aucun rappel.
      */
     val notifies: Boolean = true,
+    /**
+     * Pause prise à l'intérieur du créneau, que le planning ne montre pas : lue dans la
+     * note, ou à défaut l'horaire fixe des réglages. Nulle quand rien ne s'applique.
+     */
+    val pause: Pause? = null,
 ) {
     val duration: Duration get() = Duration.between(start, end)
 }
@@ -159,6 +164,14 @@ data class PlanningConfig(
     val lunchFallbackIn: LocalTime = LocalTime.of(13, 0),
     /** Durée minimale du bloc pour que le repli se déclenche. */
     val lunchFallbackMinBlock: Duration = Duration.ofHours(6),
+
+    /**
+     * Lire l'heure de pause dans la note du créneau — « Pause cantine 12h-13h », ou le
+     * trou entre deux animations datées. Prime sur le repli à heure fixe, qui ne sert
+     * plus que lorsque la note ne dit rien d'exploitable.
+     */
+    val notePauseEnabled: Boolean = true,
+    val notePauseKeywords: Set<String> = NotePause.DEFAULT_KEYWORDS,
 
     /**
      * Fragments de libellé désignant un créneau de réserve. « EG ou Off » signifie que la

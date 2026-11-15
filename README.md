@@ -87,8 +87,35 @@ journée.
 Les services ne sont jamais fusionnés : `10h00→19h00` suivi de `19h00→21h00` reste bien
 deux services, avec un badgeage à 19h00.
 
-Sur les journées longues d'un seul tenant, dont le planning ne prévoit aucune coupure, un
-repli ajoute un rappel à 12h et 13h. Il est actif par défaut.
+### La pause écrite dans la note
+
+La plupart des journées longues sont d'un seul tenant au planning, alors que la pause est
+bien prise — et que son heure figure souvent dans la note du responsable. L'application
+la lit, dans cet ordre :
+
+1. **Pause nommée** — un passage contenant *pause*, *cantine*, *repas*, *déj*,
+   *déjeuner*, *manger* ou *coupure*, suivi d'horaires : `Pause cantine 12h-13h`,
+   `Repas : 11h45 → 12h30`, `PAUSE DÉJ 12H30-13H15`. Une heure seule ouvre la pause,
+   fermée par une durée annoncée (`Pause 45 min à 12h15`, `Pause 1h30 à midi`) ou, à
+   défaut, par la durée de la pause forcée.
+2. **Trou entre deux activités** — quand la note date les animations sans nommer la
+   pause (`Anim 1 : 9h30-11h30` / `Anim 2 : 13h30-16h`), c'est le plus long écart entre
+   elles, à partir de 20 minutes.
+
+Garde-fous sur un texte libre : seules comptent les heures qui tombent dans le créneau
+(ce qui écarte `Trajet : 8h` ou `Covoit : 7h20`), la pause doit commencer après l'entrée
+et finir avant la sortie, et durer entre 10 minutes et 4 heures. Les mots-clés se
+comparent sans casse ni accents, et se modifient dans les réglages.
+
+L'écran du planning affiche la pause retenue sous le créneau, avec sa provenance —
+*lue dans la note*, *entre deux activités de la note* ou *horaire par défaut* — et la
+notification de départ cite la phrase de la note qui l'a fixée. La note elle-même tient
+sur une ligne, et se déplie au toucher.
+
+### Le repli à heure fixe
+
+Faute de pause dans le planning comme dans la note, un repli ajoute un rappel à 12h et
+13h sur les journées longues d'un seul tenant. Il est actif par défaut.
 
 ## Textes personnalisables
 

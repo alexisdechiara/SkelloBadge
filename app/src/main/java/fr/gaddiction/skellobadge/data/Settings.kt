@@ -1,5 +1,6 @@
 package fr.gaddiction.skellobadge.data
 
+import fr.gaddiction.skellobadge.domain.NotePause
 import fr.gaddiction.skellobadge.domain.ReminderKind
 
 /** D'où vient le planning. */
@@ -111,6 +112,14 @@ data class AppSettings(
     /** Bornes de la pause forcée, en minutes depuis minuit. */
     val lunchStartMinutes: Int = 12 * 60,
     val lunchEndMinutes: Int = 13 * 60,
+
+    /**
+     * Lire l'heure de pause dans la note du créneau : « Pause cantine 12h-13h », « Repas
+     * 11h45 → 12h30 », ou le trou entre deux animations datées. Prime sur la pause forcée.
+     */
+    val notePauseEnabled: Boolean = true,
+    /** Mots qui signalent la pause dans une note, comparés sans casse ni accents. */
+    val notePauseKeywords: Set<String> = NotePause.DEFAULT_KEYWORDS,
 
     /**
      * Un créneau dont le libellé contient l'un de ces fragments est une journée de

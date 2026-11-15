@@ -198,19 +198,40 @@ fun SettingsScreen(
 
             Section(
                 title = "Pause",
-                summary = if (settings.lunchFallbackEnabled) {
-                    "Forcée de " + formatMinutes(settings.lunchStartMinutes) +
-                        " à " + formatMinutes(settings.lunchEndMinutes)
-                } else {
-                    "Désactivée"
-                },
+                summary = pauseSummary(settings),
             ) {
+                ListItem(
+                    headlineContent = { Text("Lire la pause dans les notes") },
+                    supportingContent = {
+                        Text(
+                            "« Pause cantine 12h-13h », « Repas 11h45 → 12h30 », ou le trou " +
+                                "entre deux animations datées : l'heure écrite par le " +
+                                "responsable prime sur la pause forcée.",
+                        )
+                    },
+                    trailingContent = {
+                        Switch(
+                            checked = settings.notePauseEnabled,
+                            onCheckedChange = { checked ->
+                                haptics.toggle(checked)
+                                viewModel.update { it.copy(notePauseEnabled = checked) }
+                            },
+                        )
+                    },
+                )
+
+                if (settings.notePauseEnabled) {
+                    KeywordsField(settings.notePauseKeywords) { keywords ->
+                        viewModel.update { it.copy(notePauseKeywords = keywords) }
+                    }
+                }
+
                 ListItem(
                     headlineContent = { Text("Pause forcée") },
                     supportingContent = {
                         Text(
-                            "Ajoute un départ et un retour sur les journées longues dont le " +
-                                "planning ne prévoit aucune pause.",
+                            "Ajoute un départ et un retour sur les journées longues dont ni " +
+                                "le planning ni la note ne prévoient de pause.",
                         )
                     },
                     trailingContent = {
@@ -542,6 +563,50 @@ private fun TimeField(
             },
         )
     }
+}
+
+private fun pauseSummary(settings: AppSettings): String {
+    val fallback = if (settings.lunchFallbackEnabled) {
+        "sinon " + formatMinutes(settings.lunchStartMinutes) +
+            " – " + formatMinutes(settings.lunchEndMinutes)
+    } else {
+        null
+    }
+    return when {
+        settings.notePauseEnabled && fallback != null -> "Lue dans la note, $fallback"
+        settings.notePauseEnabled -> "Lue dans la note"
+        fallback != null -> "Forcée de " + formatMinutes(settings.lunchStartMinutes) +
+            " à " + formatMinutes(settings.lunchEndMinutes)
+        else -> "Désactivée"
+    }
+}
+
+/**
+ * Liste de mots saisie d'un bloc, séparés par des virgules.
+ *
+ * Le texte vit dans un état local : reconstruit à chaque frappe depuis l'ensemble
+ * enregistré, il perdrait la virgule qu'on vient de taper avant le mot suivant.
+ */
+@Composable
+private fun KeywordsField(keywords: Set<String>, onChange: (Set<String>) -> Unit) {
+    var text by remember { mutableStateOf(keywords.sorted().joinToString(", ")) }
+    OutlinedTextField(
+        value = text,
+        onValueChange = { value ->
+            text = value
+            onChange(
+                value.split(',')
+                    .map(String::trim)
+                    .filter(String::isNotEmpty)
+                    .toSet(),
+            )
+        },
+        label = { Text("Mots qui signalent la pause") },
+        supportingText = {
+            Text("Séparés par des virgules ; majuscules et accents sont ignorés.")
+        },
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp),
+    )
 }
 
 private fun formatMinutes(minutes: Int): String =

@@ -189,13 +189,51 @@ object PlanningEngine {
 
         if (blocks.isEmpty()) return DayPlan.Empty(date)
 
+        // La pause se cherche créneau par créneau, et seulement sur ceux qui sonnent : un
+        // créneau de réserve n'a pas plus de pause à badger que d'entrée.
+        val notifyingCount = blocks.count(WorkBlock::notifies)
+        val withPauses = blocks.map { block ->
+            if (block.notifies) block.copy(pause = pauseFor(block, notifyingCount, config)) else block
+        }
+
         // Les créneaux de réserve et les types mis en sourdine restent affichés avec leurs
         // horaires, mais sont retirés du calcul : les bornes se recalculent sur ce qui reste,
         // si bien qu'une demi-journée en sourdine ne laisse pas un rappel orphelin.
-        val notifying = blocks.filter(WorkBlock::notifies)
+        val notifying = withPauses.filter(WorkBlock::notifies)
         val reminders = if (notifying.isEmpty()) emptyList() else remindersFor(notifying, config)
-        return DayPlan.Work(date, blocks, reminders)
+        return DayPlan.Work(date, withPauses, reminders)
     }
+
+    /**
+     * Pause interne à un créneau, par ordre de confiance.
+     *
+     * D'abord la note : quand le responsable écrit « Pause cantine 12h-13h » ou date les
+     * deux animations de la journée, c'est l'heure réelle, et elle vaut pour n'importe quel
+     * créneau. Ensuite seulement le repli à heure fixe, réservé comme avant aux journées
+     * d'un seul tenant — sur une journée coupée, la coupure du planning en tient lieu.
+     */
+    private fun pauseFor(block: WorkBlock, notifyingCount: Int, config: PlanningConfig): Pause? {
+        if (config.notePauseEnabled) {
+            NotePause.find(
+                blockStart = block.start,
+                blockEnd = block.end,
+                note = block.note,
+                keywords = config.notePauseKeywords,
+                defaultLength = fallbackLength(config),
+            )?.let { return it }
+        }
+        if (!config.lunchFallbackEnabled || notifyingCount != 1) return null
+        return lunchFallback(block, config)
+    }
+
+    /**
+     * Durée prêtée à une pause dont la note ne donne que le début : celle de la pause par
+     * défaut des réglages, faute de mieux.
+     */
+    private fun fallbackLength(config: PlanningConfig): Duration =
+        Duration.between(config.lunchFallbackOut, config.lunchFallbackIn)
+            .takeIf { it > Duration.ZERO }
+            ?: Duration.ofHours(1)
 
     /**
      * Skello n'utilise pas d'événements « journée entière » au sens ICS : un repos ou une
@@ -270,29 +308,58 @@ object PlanningEngine {
             note = null,
         )
 
-        if (config.lunchFallbackEnabled && blocks.size == 1) {
-            reminders += lunchFallback(blocks.single(), config)
+        blocks.forEach { block ->
+            block.pause?.let { reminders += pauseReminders(block, it, config) }
         }
 
         return reminders.sortedBy { it.at }
     }
 
+    /** Sortie puis retour, avec les mêmes préavis qu'une coupure lue dans le planning. */
+    private fun pauseReminders(block: WorkBlock, pause: Pause, config: PlanningConfig): List<Reminder> {
+        val outAt = pause.start.minus(config.breakOutLead)
+        return listOf(
+            Reminder(
+                at = outAt,
+                kind = ReminderKind.BREAK_OUT,
+                title = block.title,
+                note = provenance(pause),
+                actionAt = pause.start,
+            ),
+            Reminder(
+                at = maxOf(pause.end.minus(config.breakInLead), outAt),
+                kind = ReminderKind.BREAK_IN,
+                title = block.title,
+                note = null,
+                actionAt = pause.end,
+            ),
+        )
+    }
+
     /**
-     * Repli pour les journées d'un seul tenant qui enjambent midi sans coupure au planning.
-     * Désactivé par défaut : sur un planning Skello réel, la majorité des journées longues
-     * sont continues et ce repli produirait surtout des notifications inutiles.
+     * Dit d'où vient l'heure, dans la notification elle-même : une pause que le planning
+     * n'affiche pas surprend moins quand on voit la phrase qui l'annonce.
      */
-    private fun lunchFallback(block: WorkBlock, config: PlanningConfig): List<Reminder> {
-        if (block.duration < config.lunchFallbackMinBlock) return emptyList()
+    private fun provenance(pause: Pause): String? = when (pause.origin) {
+        Pause.Origin.NOTE -> pause.excerpt?.let { "D'après la note : « $it »" }
+        Pause.Origin.NOTE_GAP -> "D'après la note : entre deux activités"
+        Pause.Origin.DEFAULT -> null
+    }
+
+    /**
+     * Repli pour les journées d'un seul tenant qui enjambent l'heure de pause sans coupure
+     * au planning ni horaire dans la note. Sur un planning Skello réel, la plupart des
+     * journées longues sont continues alors que la pause est bien prise.
+     */
+    private fun lunchFallback(block: WorkBlock, config: PlanningConfig): Pause? {
+        if (block.duration < config.lunchFallbackMinBlock) return null
         val zone = block.start.zone
         val date = block.start.toLocalDate()
         val out = date.atTime(config.lunchFallbackOut).atZone(zone)
         val back = date.atTime(config.lunchFallbackIn).atZone(zone)
-        if (!block.start.isBefore(out) || !block.end.isAfter(back)) return emptyList()
-
-        return listOf(
-            Reminder(out, ReminderKind.BREAK_OUT, block.title, null, out),
-            Reminder(back.minus(config.breakInLead), ReminderKind.BREAK_IN, block.title, null, back),
-        )
+        if (!block.start.isBefore(out) || !block.end.isAfter(back) || !back.isAfter(out)) {
+            return null
+        }
+        return Pause(out, back, Pause.Origin.DEFAULT)
     }
 }
