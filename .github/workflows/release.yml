@@ -1,14 +1,26 @@
 name: Publication
 
-# Une étiquette vXYZ déclenche la publication. Rien ne part sans geste explicite :
-# la clé de signature n'est jamais approchée par les constructions ordinaires.
+# Deux branches : main pour le développement, prod pour ce qui est distribué.
+# Chaque push sur prod publie une release, dont la version et les notes sont lues
+# dans la première section du CHANGELOG ; l'étiquette vX.Y.Z est créée au passage.
+#
+# Rien ne part sans geste explicite : il faut une nouvelle section en tête du
+# CHANGELOG, sans quoi la publication échoue avant même de compiler. La clé de
+# signature n'est jamais approchée par les constructions ordinaires de main.
 on:
   push:
-    tags: ['v*']
+    branches: [prod]
   workflow_dispatch:
+
+# Deux pushes rapprochés sur prod ne doivent pas publier en parallèle.
+concurrency:
+  group: publication
+  cancel-in-progress: false
 
 jobs:
   publier:
+    # Un lancement manuel depuis une autre branche ne doit rien publier.
+    if: github.ref == 'refs/heads/prod'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -33,27 +45,18 @@ jobs:
       - name: Mettre en place le cache Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Déterminer la version
+      # Avant toute compilation : une version mal préparée échoue en quelques
+      # secondes, pas au bout de cinq minutes de construction.
+      - name: Lire la version et les notes dans le CHANGELOG
         id: version
-        run: |
-          TAG="${GITHUB_REF_NAME}"
-          echo "name=${TAG#v}" >> "$GITHUB_OUTPUT"
-          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-
-      # Avant toute compilation : une version sans notes échoue en quelques secondes,
-      # pas au bout de cinq minutes de construction.
-      - name: Extraire les notes de version du CHANGELOG
         env:
-          VERSION: ${{ steps.version.outputs.name }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          awk -v v="$VERSION" '
-            /^## / { if (found) exit; found = ($2 == v); next }
-            found { print }
-          ' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
-          if ! grep -q '[^[:space:]]' "$RUNNER_TEMP/notes.md"; then
-            echo "::error file=CHANGELOG.md::Aucune section « ## $VERSION » dans CHANGELOG.md. Rédige les nouveautés de cette version, puis étiquette de nouveau."
-            exit 1
-          fi
+          LATEST=$(gh api "repos/${{ github.repository }}/releases/latest" --jq .tag_name 2>/dev/null || true)
+          VERSION=$(.github/scripts/release-info.sh CHANGELOG.md "$LATEST" "$RUNNER_TEMP/notes.md")
+          echo "name=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Publication de $VERSION (dernière publiée : ${LATEST:-aucune})"
           cat "$RUNNER_TEMP/notes.md"
 
       - name: Tests du moteur de planification
@@ -97,7 +100,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # --target crée l'étiquette sur le commit exact qui vient d'être compilé.
           gh release create "${{ steps.version.outputs.tag }}" "${{ steps.apk.outputs.path }}" \
+            --target "$GITHUB_SHA" \
             --title "Rappel Badgeuse Skello ${{ steps.version.outputs.name }}" \
             --notes-file "$RUNNER_TEMP/notes.md"
 

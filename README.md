@@ -219,28 +219,36 @@ pas mettre à jour une installation signée avec la vraie clé.
 
 ## Publier une version
 
-Deux temps : rédiger les nouveautés, puis étiqueter.
+Deux branches :
 
-1. Ajouter en tête de [`CHANGELOG.md`](CHANGELOG.md) une section `## 1.2.0` décrivant, pour
-   qui utilise l'application, ce qui change. Elle devient la description de la release
-   et s'affiche dans l'application sous *Nouveautés*.
-2. Étiqueter :
+| Branche | Rôle |
+| --- | --- |
+| `main` | Développement. Chaque push compile et teste ; rien n'est distribué. |
+| `prod` | Ce qui est installé sur les téléphones. **Chaque push publie une release.** |
 
-   ```bash
-   git tag v1.2.0 && git push origin v1.2.0
-   ```
+La version ne se tape nulle part : elle est lue dans la première section de
+[`CHANGELOG.md`](CHANGELOG.md). Au fil du développement sur `main`, cette section
+`## 1.3.0` accumule les nouveautés de la prochaine version, rédigées pour qui utilise
+l'application. Publier, c'est :
 
-Si la section manque, la publication échoue dès sa première étape, avant toute
-compilation, en disant laquelle ajouter.
+```bash
+git push origin main:prod
+```
+
+La publication crée l'étiquette `v1.3.0` sur le commit compilé, et la release avec ces
+notes, qui s'affichent aussi dans l'application sous *Nouveautés*. Elle échoue dès sa
+première étape, avant toute compilation, si la section est vide, mal intitulée, ou porte
+une version déjà publiée ou plus ancienne que la dernière — d'où l'impossibilité de
+republier par mégarde.
 
 Le workflow `Publication` compile, vérifie la signature et crée la release GitHub avec
 l'APK en pièce jointe. La clé de signature n'est pas lue depuis le disque mais depuis
 quatre secrets de dépôt — `SIGNING_KEYSTORE_BASE64`, `SIGNING_STORE_PASSWORD`,
 `SIGNING_KEY_ALIAS`, `SIGNING_KEY_PASSWORD` — reconstituée dans un fichier temporaire puis
-effacée en fin de travail. Seules les étiquettes déclenchent ce workflow : les
+effacée en fin de travail. Seule la branche `prod` déclenche ce workflow : les
 constructions ordinaires n'approchent jamais la clé.
 
-Le nom de version vient de l'étiquette, le code de version du numéro de run, qui croît
+Le nom de version vient du CHANGELOG, le code de version du numéro de run, qui croît
 strictement — Android refuse une mise à jour dont le code de version n'augmente pas.
 
 **Sur un dépôt privé, les pièces jointes d'une release exigent un compte GitHub ayant accès

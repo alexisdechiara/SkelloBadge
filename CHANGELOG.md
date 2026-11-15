@@ -7,10 +7,14 @@ description de la release GitHub, et s'affiche dans l'application sous « Nouvea
 quotidien, en une phrase par point. Le détail technique reste dans l'historique Git.
 
 <!--
-  Pour publier la version X.Y.Z :
-  1. ajouter une section « ## X.Y.Z » en tête de liste, sous ce commentaire ;
-  2. étiqueter : git tag vX.Y.Z && git push origin vX.Y.Z
-  La publication échoue d'emblée si la section manque, avant toute compilation.
+  La première section donne la version publiée. Sur main, elle décrit la prochaine
+  version au fil du développement ; publier, c'est pousser main sur prod :
+
+    git push origin main:prod
+
+  La publication lit « ## X.Y.Z », crée l'étiquette vX.Y.Z et la release avec ces notes.
+  Elle échoue d'emblée, avant toute compilation, si la version est déjà publiée ou plus
+  ancienne que la dernière : il faut alors ouvrir une nouvelle section en tête.
 -->
 
 ## 1.2.0
@@ -27,6 +31,9 @@ quotidien, en une phrase par point. Le détail technique reste dans l'historique
   notification discrète, puis téléchargée, vérifiée et installée sans passer par le
   navigateur. La configuration est conservée.
 - Les mots qui signalent la pause se règlent dans Réglages → Pause.
+
+Cette version s'installe encore à la main, depuis le fichier joint ci-dessous. Les
+suivantes se proposeront d'elles-mêmes dans l'application.
 
 ## 1.1.1
 
