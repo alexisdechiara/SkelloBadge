@@ -45,6 +45,7 @@ import fr.gaddiction.skellobadge.R
 import fr.gaddiction.skellobadge.data.AppSettings
 import fr.gaddiction.skellobadge.data.Contacts
 import fr.gaddiction.skellobadge.data.FetchErrors
+import fr.gaddiction.skellobadge.data.UpdateChecker
 import fr.gaddiction.skellobadge.domain.DayPlan
 import fr.gaddiction.skellobadge.domain.Pause
 import fr.gaddiction.skellobadge.domain.PlanningEngine
@@ -75,6 +76,7 @@ private val DAY_SHORT = DateTimeFormatter.ofPattern("d MMMM", Locale.FRANCE)
 fun HomeScreen(viewModel: AppViewModel, settings: AppSettings, onOpenSettings: () -> Unit) {
     val planning by viewModel.planning.collectAsStateWithLifecycle()
     val loading by viewModel.loading.collectAsStateWithLifecycle()
+    val update by viewModel.update.collectAsStateWithLifecycle()
     val haptics = rememberHaptics()
     val context = LocalContext.current
 
@@ -111,6 +113,24 @@ fun HomeScreen(viewModel: AppViewModel, settings: AppSettings, onOpenSettings: (
                 planning?.error?.takeIf(String::isNotBlank)?.let { error ->
                     item { SyncWarningCard(error, planning?.fromCache == true) }
                 }
+
+                // Sous les rappels et l'état du planning, qui priment : une mise à jour
+                // peut attendre, un badgeage non.
+                ((update as? AppViewModel.UpdateState.Done)?.result as? UpdateChecker.Result.Available)
+                    ?.takeIf { it.release.version != settings.dismissedUpdateVersion }
+                    ?.let { available ->
+                        item(key = "update") {
+                            UpdateCard(
+                                available = available,
+                                onOpen = { url ->
+                                    runCatching {
+                                        context.startActivity(UpdateChecker.downloadIntent(url))
+                                    }
+                                },
+                                onLater = { viewModel.dismissUpdate(available.release.version) },
+                            )
+                        }
+                    }
 
                 if (days.isEmpty() && !loading) {
                     item {
@@ -230,6 +250,59 @@ private fun NextReminderCard(reminder: Reminder?, now: ZonedDateTime) {
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
             )
+        }
+    }
+}
+
+/**
+ * Annonce d'une nouvelle version. « Plus tard » l'écarte pour de bon : la bannière ne
+ * revient qu'avec la version suivante, plutôt qu'à chaque ouverture.
+ */
+@Composable
+private fun UpdateCard(
+    available: UpdateChecker.Result.Available,
+    onOpen: (String) -> Unit,
+    onLater: () -> Unit,
+) {
+    val haptics = rememberHaptics()
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+        ),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                "Version " + available.release.version + " disponible",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onTertiaryContainer,
+            )
+            Text(
+                (available.installed.takeIf(String::isNotBlank)?.let { "Tu as la $it. " } ?: "") +
+                    "La mise à jour s'installe par-dessus, sans perdre ta configuration.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onTertiaryContainer,
+            )
+            // Trois actions ne tiennent pas sur une ligne d'écran étroit : elles passent à
+            // la ligne plutôt que d'être tronquées.
+            FlowRow(
+                modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Button(
+                    onClick = { haptics.confirm(); onOpen(available.release.downloadUrl) },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.tertiary,
+                        contentColor = MaterialTheme.colorScheme.onTertiary,
+                    ),
+                ) { Text("Mettre à jour") }
+                TextButton(onClick = { haptics.click(); onOpen(available.release.pageUrl) }) {
+                    Text("Nouveautés", color = MaterialTheme.colorScheme.onTertiaryContainer)
+                }
+                TextButton(onClick = { haptics.click(); onLater() }) {
+                    Text("Plus tard", color = MaterialTheme.colorScheme.onTertiaryContainer)
+                }
+            }
         }
     }
 }

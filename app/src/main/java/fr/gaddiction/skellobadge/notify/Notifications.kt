@@ -27,8 +27,10 @@ object Notifications {
     const val CHANNEL_ALARM = "alarm"
     const val CHANNEL_STANDBY = "standby_confirm"
     const val CHANNEL_STATUS = "status"
+    const val CHANNEL_UPDATES = "updates"
 
     const val NOTIFICATION_ID_SYNC_ERROR = 1
+    const val NOTIFICATION_ID_UPDATE = 2
 
     fun channelFor(kind: ReminderKind): String = when (kind) {
         ReminderKind.CLOCK_IN -> CHANNEL_CLOCK_IN
@@ -94,6 +96,15 @@ object Notifications {
                     CHANNEL_STATUS,
                     R.string.channel_status_name,
                     R.string.channel_status_desc,
+                    NotificationManager.IMPORTANCE_LOW,
+                ),
+                // Canal à part : on peut couper l'annonce des versions sans perdre
+                // l'alerte de planning périmé, qui, elle, conditionne les rappels.
+                channel(
+                    context,
+                    CHANNEL_UPDATES,
+                    R.string.channel_updates_name,
+                    R.string.channel_updates_desc,
                     NotificationManager.IMPORTANCE_LOW,
                 ),
             ),

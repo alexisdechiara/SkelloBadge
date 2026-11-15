@@ -7,12 +7,14 @@ import fr.gaddiction.skellobadge.data.AppSettings
 import fr.gaddiction.skellobadge.data.FetchErrors
 import fr.gaddiction.skellobadge.data.PlanningRepository
 import fr.gaddiction.skellobadge.data.SettingsRepository
+import fr.gaddiction.skellobadge.data.UpdateChecker
 import fr.gaddiction.skellobadge.data.calendar.DeviceCalendarSource
 import fr.gaddiction.skellobadge.data.ics.IcsFetcher
 import fr.gaddiction.skellobadge.data.ics.IcsParser
 import fr.gaddiction.skellobadge.data.toPlanningConfig
 import fr.gaddiction.skellobadge.domain.DayPlan
 import fr.gaddiction.skellobadge.domain.PlanningEngine
+import fr.gaddiction.skellobadge.notify.UpdateNotification
 import fr.gaddiction.skellobadge.schedule.AlarmScheduler
 import fr.gaddiction.skellobadge.schedule.RefreshWorker
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -68,6 +70,58 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
          * petit. Un code HTTP seul n'apprend rien à qui vient de coller une adresse.
          */
         data class Failed(val message: String, val detail: String) : LinkCheck
+    }
+
+    /** Recherche d'une nouvelle version parmi les releases GitHub. */
+    sealed interface UpdateState {
+        data object Idle : UpdateState
+        data object Checking : UpdateState
+        data class Done(val result: UpdateChecker.Result) : UpdateState
+    }
+
+    private val updateChecker = UpdateChecker(application)
+
+    /** Version installée, affichée dans les réglages. */
+    val installedVersion: String = updateChecker.installedVersion()
+
+    private val _update = MutableStateFlow<UpdateState>(UpdateState.Idle)
+    val update: StateFlow<UpdateState> = _update.asStateFlow()
+
+    /**
+     * Vérifie s'il existe une version plus récente.
+     *
+     * Automatiquement, une seule fois par session : l'écran d'accueil s'ouvre souvent, et
+     * l'API anonyme de GitHub est limitée. À la demande, depuis les réglages, à chaque fois
+     * — et même si la vérification automatique est coupée.
+     */
+    fun checkForUpdate(manual: Boolean = false) {
+        if (!manual && _update.value != UpdateState.Idle) return
+        if (_update.value == UpdateState.Checking) return
+        viewModelScope.launch {
+            if (!manual && !settingsRepository.current().updateCheckEnabled) return@launch
+            _update.value = UpdateState.Checking
+            val result = updateChecker.check()
+            _update.value = UpdateState.Done(result)
+
+            if (result !is UpdateChecker.Result.Failed) {
+                // Compte comme la vérification du jour : le travail de fond n'a pas à la
+                // refaire dans l'heure.
+                settingsRepository.update {
+                    it.copy(lastUpdateCheckEpochMillis = System.currentTimeMillis())
+                }
+            }
+            if (result is UpdateChecker.Result.UpToDate) {
+                UpdateNotification.cancel(getApplication())
+            }
+        }
+    }
+
+    /** « Plus tard » : cette version ne sera plus proposée, la suivante le sera. */
+    fun dismissUpdate(version: String) {
+        viewModelScope.launch {
+            settingsRepository.update { it.copy(dismissedUpdateVersion = version) }
+            UpdateNotification.cancel(getApplication())
+        }
     }
 
     private val _linkCheck = MutableStateFlow<LinkCheck>(LinkCheck.Idle)

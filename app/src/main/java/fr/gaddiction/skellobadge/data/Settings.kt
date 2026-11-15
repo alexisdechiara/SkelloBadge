@@ -168,6 +168,17 @@ data class AppSettings(
 
     val lastSyncEpochMillis: Long = 0L,
     val lastSyncError: String = "",
+
+    /**
+     * Chercher, une fois par jour, une version plus récente parmi les releases GitHub.
+     * L'application étant installée hors du Play Store, rien d'autre ne la tient à jour.
+     */
+    val updateCheckEnabled: Boolean = true,
+    val lastUpdateCheckEpochMillis: Long = 0L,
+    /** Dernière version déjà annoncée par notification : on ne la répète pas chaque jour. */
+    val notifiedUpdateVersion: String = "",
+    /** Version écartée d'un « Plus tard » : sa bannière ne revient pas, la suivante si. */
+    val dismissedUpdateVersion: String = "",
 ) {
     fun wordingFor(kind: ReminderKind): Wording =
         wording[kind] ?: Wording.DEFAULTS.getValue(kind)

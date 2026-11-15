@@ -21,6 +21,11 @@ jobs:
 
       - name: Installer le SDK Android
         uses: android-actions/setup-android@v3
+        with:
+          # Par défaut, l'action installe aussi le paquet « tools », retiré des dépôts
+          # Google : sdkmanager échoue alors et fait tomber tout le workflow. Les
+          # plateformes manquantes sont, elles, téléchargées par Gradle à la demande.
+          packages: 'platform-tools'
 
       - name: Mettre en place le cache Gradle
         uses: gradle/actions/setup-gradle@v4

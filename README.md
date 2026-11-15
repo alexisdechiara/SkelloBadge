@@ -14,6 +14,22 @@ récente ; les mises à jour s'installent par-dessus, sans perdre la configurati
 
 Android 8.0 ou plus récent.
 
+### Mises à jour
+
+L'application vérifie elle-même, une fois par jour, si une version plus récente est
+publiée dans les [releases](https://github.com/alexisdechiara/SkelloBadge/releases) :
+
+- une **notification discrète** (canal « Nouvelle version », sans son) l'annonce une seule
+  fois ; la toucher télécharge l'APK, qu'Android propose ensuite d'installer ;
+- une **bannière** sur l'écran d'accueil propose *Mettre à jour*, *Nouveautés* ou
+  *Plus tard* — qui écarte cette version, la suivante sera de nouveau proposée ;
+- la section **Mises à jour** des réglages affiche la version installée, permet de
+  couper la vérification automatique et de lancer une recherche à la demande.
+
+Seules les releases publiées comptent : brouillons et préversions ne sont jamais
+proposés. La comparaison est numérique (`1.10.0` est plus récent que `1.9.0`). La
+vérification passe après la pose des alarmes et n'en bloque jamais aucune.
+
 ## Ce qu'elle fait
 
 À chaque échéance du planning, une notification tombe :

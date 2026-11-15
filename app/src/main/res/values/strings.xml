@@ -22,6 +22,8 @@
     <string name="channel_alarm_desc">Alarme plein écran quand un rappel reste ignoré</string>
     <string name="channel_status_name">État de la synchronisation</string>
     <string name="channel_status_desc">Signale un planning qui ne peut plus être récupéré</string>
+    <string name="channel_updates_name">Nouvelle version</string>
+    <string name="channel_updates_desc">Annonce une mise à jour de l’application publiée sur GitHub</string>
 
     <!-- Le texte des rappels est modifiable dans les réglages ; seuls les préfixes
          d’escalade restent figés, car ils décrivent l’état et non le rappel. -->
@@ -31,6 +33,9 @@
 
     <string name="notif_sync_error_title">Planning non récupéré</string>
     <string name="notif_sync_error_text">Rien de neuf depuis %1$s. Les rappels reposent sur la dernière version connue.</string>
+
+    <string name="notif_update_title">Version %1$s disponible</string>
+    <string name="notif_update_text">Tu utilises la %1$s. Touche pour télécharger la mise à jour : la configuration est conservée.</string>
 
     <string name="action_badged">J’ai badgé</string>
     <string name="action_snooze">Dans 5 min</string>

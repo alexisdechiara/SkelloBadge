@@ -13,6 +13,7 @@ import fr.gaddiction.skellobadge.data.PlanningRepository
 import fr.gaddiction.skellobadge.data.SettingsRepository
 import fr.gaddiction.skellobadge.domain.PlanningEngine
 import fr.gaddiction.skellobadge.notify.SyncNotification
+import fr.gaddiction.skellobadge.notify.UpdateNotification
 import java.time.Duration
 import java.time.ZonedDateTime
 import java.util.concurrent.TimeUnit
@@ -76,6 +77,10 @@ class RefreshWorker(
             SyncNotification.update(applicationContext, updated.lastSyncEpochMillis, at)
 
             Log.i(TAG, "Replanification terminee: " + reminders.size + " rappels")
+
+            // Après les rappels, jamais avant : une vérification lente ou en échec ne doit
+            // pas retarder la pose des alarmes. Elle ne s'exécute qu'une fois par jour.
+            UpdateNotification.checkIfDue(applicationContext, settingsRepository)
             Result.success()
         } catch (t: Throwable) {
             Log.e(TAG, "Echec de la replanification", t)

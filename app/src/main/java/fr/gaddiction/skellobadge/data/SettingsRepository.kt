@@ -64,6 +64,10 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.KNOWN_TYPES] = updated.knownShiftTypes
             prefs[Keys.LAST_SYNC] = updated.lastSyncEpochMillis
             prefs[Keys.LAST_SYNC_ERROR] = updated.lastSyncError
+            prefs[Keys.UPDATE_CHECK] = updated.updateCheckEnabled
+            prefs[Keys.LAST_UPDATE_CHECK] = updated.lastUpdateCheckEpochMillis
+            prefs[Keys.NOTIFIED_UPDATE] = updated.notifiedUpdateVersion
+            prefs[Keys.DISMISSED_UPDATE] = updated.dismissedUpdateVersion
 
             ReminderKind.entries.forEach { kind ->
                 val wording = updated.wordingFor(kind)
@@ -126,6 +130,12 @@ class SettingsRepository(private val context: Context) {
             },
             lastSyncEpochMillis = prefs[Keys.LAST_SYNC] ?: defaults.lastSyncEpochMillis,
             lastSyncError = prefs[Keys.LAST_SYNC_ERROR] ?: defaults.lastSyncError,
+            updateCheckEnabled = prefs[Keys.UPDATE_CHECK] ?: defaults.updateCheckEnabled,
+            lastUpdateCheckEpochMillis = prefs[Keys.LAST_UPDATE_CHECK]
+                ?: defaults.lastUpdateCheckEpochMillis,
+            notifiedUpdateVersion = prefs[Keys.NOTIFIED_UPDATE] ?: defaults.notifiedUpdateVersion,
+            dismissedUpdateVersion = prefs[Keys.DISMISSED_UPDATE]
+                ?: defaults.dismissedUpdateVersion,
         )
     }
 
@@ -170,5 +180,9 @@ class SettingsRepository(private val context: Context) {
         val KNOWN_TYPES = stringSetPreferencesKey("known_types")
         val LAST_SYNC = longPreferencesKey("last_sync")
         val LAST_SYNC_ERROR = stringPreferencesKey("last_sync_error")
+        val UPDATE_CHECK = booleanPreferencesKey("update_check")
+        val LAST_UPDATE_CHECK = longPreferencesKey("last_update_check")
+        val NOTIFIED_UPDATE = stringPreferencesKey("notified_update_version")
+        val DISMISSED_UPDATE = stringPreferencesKey("dismissed_update_version")
     }
 }

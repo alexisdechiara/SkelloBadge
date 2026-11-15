@@ -54,6 +54,7 @@ import fr.gaddiction.skellobadge.R
 import fr.gaddiction.skellobadge.data.AppSettings
 import fr.gaddiction.skellobadge.data.Contacts
 import fr.gaddiction.skellobadge.data.PlanningSource
+import fr.gaddiction.skellobadge.data.UpdateChecker
 import fr.gaddiction.skellobadge.data.Wording
 import fr.gaddiction.skellobadge.domain.ReminderKind
 import fr.gaddiction.skellobadge.ui.AppViewModel
@@ -74,7 +75,9 @@ fun SettingsScreen(
     onBack: () -> Unit,
 ) {
     val fromPlanning by viewModel.shiftTypes.collectAsStateWithLifecycle()
+    val update by viewModel.update.collectAsStateWithLifecycle()
     val haptics = rememberHaptics()
+    val context = LocalContext.current
 
     // La liste réunit ce que le planning montre aujourd'hui et tout ce que l'application a
     // déjà rencontré : un service saisonnier ne disparaît pas des réglages parce qu'il est
@@ -425,6 +428,40 @@ fun SettingsScreen(
             }
 
             Section(
+                title = "Mises à jour",
+                summary = "Version " + viewModel.installedVersion.ifBlank { "inconnue" } +
+                    if (settings.updateCheckEnabled) " · vérifiée chaque jour" else "",
+            ) {
+                ListItem(
+                    headlineContent = { Text("Vérifier automatiquement") },
+                    supportingContent = {
+                        Text(
+                            "Une fois par jour, cherche une nouvelle version parmi les " +
+                                "publications GitHub et l'annonce par une notification discrète.",
+                        )
+                    },
+                    trailingContent = {
+                        Switch(
+                            checked = settings.updateCheckEnabled,
+                            onCheckedChange = { checked ->
+                                haptics.toggle(checked)
+                                viewModel.update { it.copy(updateCheckEnabled = checked) }
+                            },
+                        )
+                    },
+                )
+
+                UpdateStatus(
+                    state = update,
+                    haptics = haptics,
+                    onCheck = { viewModel.checkForUpdate(manual = true) },
+                    onOpen = { url ->
+                        runCatching { context.startActivity(UpdateChecker.downloadIntent(url)) }
+                    },
+                )
+            }
+
+            Section(
                 title = "Configuration",
                 summary = settings.targetLabel.ifBlank { "Badgeuse" },
             ) {
@@ -562,6 +599,58 @@ private fun TimeField(
                 TextButton(onClick = { haptics.click(); open = false }) { Text("Annuler") }
             },
         )
+    }
+}
+
+/**
+ * Recherche à la demande, et son résultat. Elle ignore un « Plus tard » donné sur
+ * l'accueil : qui vient chercher une mise à jour veut la voir.
+ */
+@Composable
+private fun UpdateStatus(
+    state: AppViewModel.UpdateState,
+    haptics: Haptics,
+    onCheck: () -> Unit,
+    onOpen: (String) -> Unit,
+) {
+    val result = (state as? AppViewModel.UpdateState.Done)?.result
+    val message = when {
+        state == AppViewModel.UpdateState.Checking -> "Recherche en cours…"
+        result is UpdateChecker.Result.UpToDate -> "Tu as la dernière version."
+        result is UpdateChecker.Result.Available ->
+            "La version " + result.release.version + " est disponible. Elle s'installe " +
+                "par-dessus l'actuelle, sans perdre ta configuration."
+        result is UpdateChecker.Result.Failed -> "Vérification impossible : " + result.reason + "."
+        else -> null
+    }
+    message?.let {
+        Text(
+            it,
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (result is UpdateChecker.Result.Failed) {
+                MaterialTheme.colorScheme.error
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+        )
+    }
+
+    if (result is UpdateChecker.Result.Available) {
+        FilledTonalButton(
+            onClick = { haptics.confirm(); onOpen(result.release.downloadUrl) },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp),
+        ) { Text("Télécharger la version " + result.release.version) }
+        TextButton(
+            onClick = { haptics.click(); onOpen(result.release.pageUrl) },
+            modifier = Modifier.padding(horizontal = 12.dp),
+        ) { Text("Voir les nouveautés") }
+    } else {
+        OutlinedButton(
+            onClick = { haptics.click(); onCheck() },
+            enabled = state != AppViewModel.UpdateState.Checking,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp),
+        ) { Text("Rechercher une mise à jour") }
     }
 }
 

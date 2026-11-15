@@ -45,10 +45,14 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /** Chaque retour dans l'application est une occasion de resynchroniser le planning. */
+    /**
+     * Chaque retour dans l'application est une occasion de resynchroniser le planning, et,
+     * une fois par session, de vérifier qu'aucune nouvelle version n'attend.
+     */
     override fun onStart() {
         super.onStart()
         viewModel.refresh()
+        viewModel.checkForUpdate()
     }
 }
 
