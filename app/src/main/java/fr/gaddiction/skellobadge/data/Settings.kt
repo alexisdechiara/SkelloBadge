@@ -22,6 +22,64 @@ enum class BadgeTarget {
 }
 
 /**
+ * Sonnerie livrée avec l'application, dans `res/raw/tone_<nom>.ogg`.
+ *
+ * Le son de notification par défaut du téléphone est celui de toutes les autres
+ * applications : au milieu d'un service, rien ne distingue alors un rappel de badgeage
+ * d'un message quelconque. Ces sons-là ne servent qu'ici.
+ */
+enum class Tone(val label: String, val description: String) {
+    CARILLON("Carillon", "Deux notes montantes, nettes sans être agressives"),
+    CLOCHETTE("Clochette", "Un seul tintement clair"),
+    MARIMBA("Marimba", "Quatre notes boisées, en arpège"),
+    BIPS("Bips", "Trois bips aigus, audibles dans le bruit"),
+    REVEIL("Réveil", "Bips alternés, façon réveil"),
+    ;
+
+    /** Nom de la ressource audio, stable d'une version à l'autre contrairement à son identifiant. */
+    val resourceName: String get() = "tone_" + name.lowercase()
+}
+
+/** Son d'un rappel ou de l'alarme. */
+sealed interface Sound {
+
+    data class Bundled(val tone: Tone) : Sound
+
+    /** Le son par défaut du téléphone : celui des notifications, ou celui des alarmes. */
+    data object Phone : Sound
+
+    /** Un son choisi dans la liste du téléphone, désigné par son adresse. */
+    data class Picked(val uri: String) : Sound
+
+    /** Forme enregistrée dans les préférences, relue par [parse]. */
+    val key: String
+        get() = when (this) {
+            is Bundled -> PREFIX_TONE + tone.name
+            Phone -> KEY_PHONE
+            is Picked -> PREFIX_URI + uri
+        }
+
+    companion object {
+        private const val PREFIX_TONE = "tone:"
+        private const val PREFIX_URI = "uri:"
+        private const val KEY_PHONE = "phone"
+
+        /** Nul si la clé est absente ou désigne une sonnerie qui n'existe plus. */
+        fun parse(key: String?): Sound? = when {
+            key == null -> null
+            key == KEY_PHONE -> Phone
+            key.startsWith(PREFIX_TONE) -> Tone.entries
+                .firstOrNull { it.name == key.removePrefix(PREFIX_TONE) }
+                ?.let(::Bundled)
+            key.startsWith(PREFIX_URI) -> key.removePrefix(PREFIX_URI)
+                .takeIf(String::isNotBlank)
+                ?.let(::Picked)
+            else -> null
+        }
+    }
+}
+
+/**
  * Texte d'un rappel. Le corps accepte deux marqueurs, remplacés au moment de l'affichage :
  * `{heure}` par l'heure de l'action et `{poste}` par le libellé du service.
  */
@@ -106,6 +164,14 @@ data class AppSettings(
     /** Alarme plein écran, façon réveil, si le rappel reste ignoré trop longtemps. */
     val fullScreenAlarmEnabled: Boolean = true,
     val fullScreenAlarmAfterMinutes: Int = 5,
+
+    /** Son des rappels, commun à tous leurs types. */
+    val reminderSound: Sound = DEFAULT_REMINDER_SOUND,
+    /**
+     * Son de l'alarme plein écran. Celui du réveil par défaut : il est fait pour tirer du
+     * sommeil, et le téléphone le joue au volume des alarmes.
+     */
+    val alarmSound: Sound = Sound.Phone,
 
     /** Rappel de pause sur les journées longues dont le planning ne prévoit rien. */
     val lunchFallbackEnabled: Boolean = true,
@@ -200,6 +266,8 @@ data class AppSettings(
         }
 
     companion object {
+        val DEFAULT_REMINDER_SOUND: Sound = Sound.Bundled(Tone.CARILLON)
+
         /**
          * « Skello : la badgeuse » sur le Play Store, mais l'application s'installe sous
          * le nom « Badgeuse » : c'est ce libellé-là que l'utilisateur reconnaît, et celui

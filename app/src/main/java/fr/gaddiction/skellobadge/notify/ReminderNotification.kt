@@ -22,7 +22,7 @@ object ReminderNotification {
     }
 
     private fun build(context: Context, payload: ReminderPayload, source: Intent) =
-        NotificationCompat.Builder(context, channelFor(payload))
+        NotificationCompat.Builder(context, channelFor(context, payload))
             .setSmallIcon(R.drawable.ic_stat_badge)
             .setContentTitle(titleFor(context, payload))
             .setContentText(payload.bodyText)
@@ -75,8 +75,12 @@ object ReminderNotification {
             }
             .build()
 
-    private fun channelFor(payload: ReminderPayload): String =
-        if (payload.shouldEscalate) Notifications.CHANNEL_ALARM else Notifications.channelFor(payload.kind)
+    private fun channelFor(context: Context, payload: ReminderPayload): String =
+        if (payload.shouldEscalate) {
+            Notifications.CHANNEL_ALARM
+        } else {
+            Notifications.channelFor(context, payload.kind)
+        }
 
     private fun titleFor(context: Context, payload: ReminderPayload): String = when {
         payload.shouldEscalate -> context.getString(

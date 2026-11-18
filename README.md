@@ -72,6 +72,23 @@ Le timing étant contrôlé de près, un rappel ignoré ne s'efface pas :
 
 Les trois valeurs sont réglables, et l'alarme se désactive si elle est jugée excessive.
 
+## Les sons
+
+Les rappels sonnent par défaut sur un **carillon** propre à l'application : le son de
+notification du téléphone est celui de tous les messages, et ne dit pas qu'il faut badger.
+Réglages → **Sons** propose, à l'écoute :
+
+- cinq sons intégrés — *Carillon*, *Clochette*, *Marimba*, *Bips*, *Réveil* ;
+- le son du téléphone ;
+- *Autre son du téléphone…*, qui ouvre le sélecteur d'Android.
+
+Le son des rappels vaut pour tous leurs types. Android figeant le son d'un canal de
+notification à sa création, en changer remplace les canaux des rappels par de nouveaux ;
+l'importance et la vibration réglées dans les paramètres Android sont reportées.
+
+L'alarme plein écran a son propre son, la sonnerie du réveil par défaut. Si le son choisi
+a disparu du téléphone, elle se rabat sur cette sonnerie plutôt que de rester muette.
+
 ## Comment les jours off sont reconnus
 
 Skello n'utilise pas d'événements « journée entière » au sens iCalendar : un repos ou une

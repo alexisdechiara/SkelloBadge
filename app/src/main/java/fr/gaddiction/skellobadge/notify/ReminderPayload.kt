@@ -1,6 +1,7 @@
 package fr.gaddiction.skellobadge.notify
 
 import android.content.Intent
+import fr.gaddiction.skellobadge.data.Sound
 import fr.gaddiction.skellobadge.domain.ReminderKind
 import fr.gaddiction.skellobadge.schedule.ReminderIntents
 import java.time.Instant
@@ -26,6 +27,8 @@ data class ReminderPayload(
     val nagMaxCount: Int,
     val fullScreenEnabled: Boolean,
     val fullScreenAfterMinutes: Int,
+    /** Ce que joue l'alarme plein écran. */
+    val alarmSound: Sound = Sound.Phone,
     /** Test : ouvrir l'écran d'alarme immédiatement, sans attendre un écran verrouillé. */
     val forceFullScreen: Boolean = false,
 ) {
@@ -69,6 +72,8 @@ data class ReminderPayload(
                     intent.getBooleanExtra(ReminderIntents.EXTRA_FULLSCREEN_ENABLED, false),
                 fullScreenAfterMinutes =
                     intent.getIntExtra(ReminderIntents.EXTRA_FULLSCREEN_AFTER, 0),
+                alarmSound = Sound.parse(intent.getStringExtra(ReminderIntents.EXTRA_ALARM_SOUND))
+                    ?: Sound.Phone,
                 forceFullScreen =
                     intent.getBooleanExtra(ReminderIntents.EXTRA_FORCE_FULLSCREEN, false),
             )

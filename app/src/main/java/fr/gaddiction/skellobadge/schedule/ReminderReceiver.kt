@@ -29,7 +29,7 @@ class ReminderReceiver : BroadcastReceiver() {
         // Le signal sonore appartient au processus, non à l'écran d'alarme : il retentit
         // même si le système refuse l'affichage plein écran.
         if (payload.shouldEscalate) {
-            AlarmSignal.start(context)
+            AlarmSignal.start(context, payload.alarmSound)
         }
 
         ReminderNotification.post(context, payload, intent)

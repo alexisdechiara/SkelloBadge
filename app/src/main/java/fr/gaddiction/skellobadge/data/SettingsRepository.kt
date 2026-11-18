@@ -49,6 +49,8 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.NAG_MAX] = updated.nagMaxCount
             prefs[Keys.FULLSCREEN_ENABLED] = updated.fullScreenAlarmEnabled
             prefs[Keys.FULLSCREEN_AFTER] = updated.fullScreenAlarmAfterMinutes
+            prefs[Keys.REMINDER_SOUND] = updated.reminderSound.key
+            prefs[Keys.ALARM_SOUND] = updated.alarmSound.key
             prefs[Keys.LUNCH_FALLBACK] = updated.lunchFallbackEnabled
             prefs[Keys.LUNCH_START] = updated.lunchStartMinutes
             prefs[Keys.LUNCH_END] = updated.lunchEndMinutes
@@ -108,6 +110,8 @@ class SettingsRepository(private val context: Context) {
                 ?: defaults.fullScreenAlarmEnabled,
             fullScreenAlarmAfterMinutes = prefs[Keys.FULLSCREEN_AFTER]
                 ?: defaults.fullScreenAlarmAfterMinutes,
+            reminderSound = Sound.parse(prefs[Keys.REMINDER_SOUND]) ?: defaults.reminderSound,
+            alarmSound = Sound.parse(prefs[Keys.ALARM_SOUND]) ?: defaults.alarmSound,
             lunchFallbackEnabled = prefs[Keys.LUNCH_FALLBACK] ?: defaults.lunchFallbackEnabled,
             lunchStartMinutes = prefs[Keys.LUNCH_START] ?: defaults.lunchStartMinutes,
             lunchEndMinutes = prefs[Keys.LUNCH_END] ?: defaults.lunchEndMinutes,
@@ -165,6 +169,8 @@ class SettingsRepository(private val context: Context) {
         val NAG_MAX = intPreferencesKey("nag_max")
         val FULLSCREEN_ENABLED = booleanPreferencesKey("fullscreen_enabled")
         val FULLSCREEN_AFTER = intPreferencesKey("fullscreen_after")
+        val REMINDER_SOUND = stringPreferencesKey("reminder_sound")
+        val ALARM_SOUND = stringPreferencesKey("alarm_sound")
         val LUNCH_FALLBACK = booleanPreferencesKey("lunch_fallback")
         val LUNCH_START = intPreferencesKey("lunch_start_minutes")
         val LUNCH_END = intPreferencesKey("lunch_end_minutes")

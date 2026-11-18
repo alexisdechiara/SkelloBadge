@@ -1,6 +1,8 @@
 package fr.gaddiction.skellobadge.ui.settings
 
 import android.app.Activity
+import android.media.RingtoneManager
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -16,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
@@ -30,6 +33,7 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -38,6 +42,7 @@ import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,18 +52,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.content.IntentCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import fr.gaddiction.skellobadge.R
 import fr.gaddiction.skellobadge.data.AppSettings
 import fr.gaddiction.skellobadge.data.Contacts
 import fr.gaddiction.skellobadge.data.PlanningSource
+import fr.gaddiction.skellobadge.data.Sound
+import fr.gaddiction.skellobadge.data.Tone
 import fr.gaddiction.skellobadge.data.UpdateChecker
 import fr.gaddiction.skellobadge.data.UpdateInstaller
 import fr.gaddiction.skellobadge.data.Wording
 import fr.gaddiction.skellobadge.domain.ReleaseNotes
 import fr.gaddiction.skellobadge.domain.ReminderKind
+import fr.gaddiction.skellobadge.notify.SoundPreview
+import fr.gaddiction.skellobadge.notify.Sounds
 import fr.gaddiction.skellobadge.ui.AppViewModel
 import fr.gaddiction.skellobadge.ui.Haptics
 import fr.gaddiction.skellobadge.ui.ReleaseNotesList
@@ -202,6 +213,41 @@ fun SettingsScreen(
                     haptics,
                     subtitle = "0 pour ne jamais relancer",
                 ) { viewModel.update { s -> s.copy(nagIntervalMinutes = it) } }
+            }
+
+            Section(
+                title = "Sons",
+                summary = "Rappels : " + Sounds.label(context, settings.reminderSound) +
+                    if (settings.fullScreenAlarmEnabled) {
+                        " · alarme : " + Sounds.label(context, settings.alarmSound)
+                    } else {
+                        ""
+                    },
+            ) {
+                SoundField(
+                    title = "Son des rappels",
+                    current = settings.reminderSound,
+                    forAlarm = false,
+                    haptics = haptics,
+                ) { sound -> viewModel.update { it.copy(reminderSound = sound) } }
+
+                if (settings.fullScreenAlarmEnabled) {
+                    SoundField(
+                        title = "Son de l'alarme plein écran",
+                        current = settings.alarmSound,
+                        forAlarm = true,
+                        haptics = haptics,
+                    ) { sound -> viewModel.update { it.copy(alarmSound = sound) } }
+                }
+
+                Text(
+                    "Le son des rappels vaut pour tous leurs types, et remplace celui qui " +
+                        "aurait été réglé type par type dans les paramètres Android. " +
+                        "L'alarme sonne au volume des alarmes, sauf en mode vibreur ou " +
+                        "silencieux ; la vibration, elle, part toujours.",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                )
             }
 
             Section(
@@ -559,6 +605,132 @@ private fun ContactPicker(
                 runCatching { picker.launch(Contacts.pickIntent()) }
             },
         ) { Text(if (settings.contactName.isBlank()) "Choisir" else "Changer") }
+    }
+}
+
+/**
+ * Choix d'un son. La liste s'ouvre dans une fenêtre où chaque son se fait entendre au
+ * toucher, sur le flux où il retentira : on choisit à l'oreille, pas sur un nom.
+ */
+@Composable
+private fun SoundField(
+    title: String,
+    current: Sound,
+    forAlarm: Boolean,
+    haptics: Haptics,
+    onChange: (Sound) -> Unit,
+) {
+    val context = LocalContext.current
+    var open by remember { mutableStateOf(false) }
+
+    val picker = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            result.data
+                ?.let {
+                    IntentCompat.getParcelableExtra(
+                        it,
+                        RingtoneManager.EXTRA_RINGTONE_PICKED_URI,
+                        Uri::class.java,
+                    )
+                }
+                ?.let { onChange(Sound.Picked(it.toString())) }
+        }
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(Sounds.label(context, current), style = MaterialTheme.typography.bodySmall)
+        }
+        FilledTonalButton(onClick = { haptics.click(); open = true }) { Text("Changer") }
+    }
+
+    if (open) {
+        var selected by remember { mutableStateOf(current) }
+        val close = {
+            SoundPreview.stop()
+            open = false
+        }
+        // Le son en cours d'écoute ne doit pas survivre à la fenêtre qui l'a lancé.
+        DisposableEffect(Unit) { onDispose { SoundPreview.stop() } }
+
+        val choices = remember(current) {
+            Tone.entries.map { Sound.Bundled(it) } + Sound.Phone +
+                listOfNotNull(current as? Sound.Picked)
+        }
+
+        AlertDialog(
+            onDismissRequest = close,
+            title = { Text(title) },
+            text = {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    choices.forEach { sound ->
+                        SoundChoice(
+                            label = Sounds.label(context, sound),
+                            description = when (sound) {
+                                is Sound.Bundled -> sound.tone.description
+                                Sound.Phone ->
+                                    if (forAlarm) "Celui du réveil" else "Celui des notifications"
+                                is Sound.Picked -> "Choisi dans le téléphone"
+                            },
+                            selected = sound == selected,
+                        ) {
+                            haptics.tick()
+                            selected = sound
+                            SoundPreview.play(context, sound, forAlarm)
+                        }
+                    }
+                    TextButton(
+                        onClick = {
+                            haptics.click()
+                            SoundPreview.stop()
+                            runCatching { picker.launch(Sounds.pickerIntent(current, forAlarm)) }
+                            open = false
+                        },
+                        modifier = Modifier.padding(top = 4.dp),
+                    ) { Text("Autre son du téléphone…") }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    haptics.confirm()
+                    if (selected != current) onChange(selected)
+                    close()
+                }) { Text("Choisir ce son") }
+            },
+            dismissButton = {
+                TextButton(onClick = { haptics.click(); close() }) { Text("Annuler") }
+            },
+        )
+    }
+}
+
+@Composable
+private fun SoundChoice(
+    label: String,
+    description: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RadioButton(selected = selected, onClick = null)
+        Column(modifier = Modifier.padding(start = 12.dp)) {
+            Text(label, style = MaterialTheme.typography.bodyLarge)
+            Text(description, style = MaterialTheme.typography.bodySmall)
+        }
     }
 }
 

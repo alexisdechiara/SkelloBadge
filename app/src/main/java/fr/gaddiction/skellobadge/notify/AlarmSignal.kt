@@ -4,7 +4,7 @@ import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.MediaPlayer
-import android.media.RingtoneManager
+import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -12,6 +12,7 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.util.Log
+import fr.gaddiction.skellobadge.data.Sound
 
 /**
  * Son et vibration de l'alarme de retard, en boucle jusqu'à ce qu'on y réponde.
@@ -31,12 +32,12 @@ object AlarmSignal {
     private val autoStop = Handler(Looper.getMainLooper())
 
     @Synchronized
-    fun start(context: Context) {
+    fun start(context: Context, sound: Sound) {
         // Un rappel déjà en train de sonner ne doit pas se superposer à lui-même.
         if (player != null || vibrator != null) return
 
         startVibration(context)
-        if (soundAllowed(context)) startSound(context)
+        if (soundAllowed(context)) startSound(context, sound)
 
         // Filet de sécurité : si le téléphone reste hors de portée, on cesse de sonner au
         // bout de quelques minutes plutôt que de vider la batterie.
@@ -69,20 +70,30 @@ object AlarmSignal {
         return audio.ringerMode == AudioManager.RINGER_MODE_NORMAL
     }
 
-    private fun startSound(context: Context) {
-        val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-            ?: return
+    /**
+     * Un son choisi dans le téléphone peut avoir disparu depuis — fichier supprimé, carte
+     * retirée. Plutôt qu'une alarme muette, on se rabat alors sur celle du téléphone.
+     */
+    private fun startSound(context: Context, sound: Sound) {
+        val chosen = Sounds.uriOf(context, sound, forAlarm = true)
+        val fallback = Sounds.phoneDefault(forAlarm = true)
+        player = loop(context, chosen) ?: fallback.takeIf { it != chosen }?.let { loop(context, it) }
+    }
 
-        runCatching {
-            player = MediaPlayer().apply {
+    private fun loop(context: Context, uri: Uri): MediaPlayer? {
+        val created = MediaPlayer()
+        return runCatching {
+            created.apply {
                 setDataSource(context.applicationContext, uri)
                 setAudioAttributes(alarmAttributes())
                 isLooping = true
                 prepare()
                 start()
             }
-        }.onFailure { Log.w(TAG, "Lecture de l'alarme impossible", it) }
+        }.onFailure {
+            Log.w(TAG, "Lecture de l'alarme impossible : " + uri, it)
+            created.release()
+        }.getOrNull()
     }
 
     private fun startVibration(context: Context) {

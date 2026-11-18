@@ -39,6 +39,7 @@ object ReminderIntents {
     const val EXTRA_NAG_MAX = "nag_max"
     const val EXTRA_FULLSCREEN_ENABLED = "fullscreen_enabled"
     const val EXTRA_FULLSCREEN_AFTER = "fullscreen_after"
+    const val EXTRA_ALARM_SOUND = "alarm_sound"
 
     /**
      * Ouvre l'écran d'alarme sans attendre que le téléphone soit verrouillé.
@@ -94,6 +95,7 @@ object ReminderIntents {
                 !isErrand && settings.fullScreenAlarmEnabled,
             )
             putExtra(EXTRA_FULLSCREEN_AFTER, settings.fullScreenAlarmAfterMinutes)
+            putExtra(EXTRA_ALARM_SOUND, settings.alarmSound.key)
             putExtra(EXTRA_FORCE_FULLSCREEN, forceFullScreen)
             if (isErrand) {
                 putExtra(EXTRA_CONTACT_NUMBER, settings.contactNumber)

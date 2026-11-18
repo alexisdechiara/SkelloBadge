@@ -15,6 +15,7 @@ import fr.gaddiction.skellobadge.data.ics.IcsParser
 import fr.gaddiction.skellobadge.data.toPlanningConfig
 import fr.gaddiction.skellobadge.domain.DayPlan
 import fr.gaddiction.skellobadge.domain.PlanningEngine
+import fr.gaddiction.skellobadge.notify.Notifications
 import fr.gaddiction.skellobadge.notify.UpdateNotification
 import fr.gaddiction.skellobadge.schedule.AlarmScheduler
 import fr.gaddiction.skellobadge.schedule.RefreshWorker
@@ -261,7 +262,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun update(transform: (AppSettings) -> AppSettings) {
         viewModelScope.launch {
-            settingsRepository.update(transform)
+            val updated = settingsRepository.update(transform)
+            // Le son des rappels vit dans les canaux de notification, pas dans les alarmes
+            // posées : il s'applique tout de suite, y compris aux rappels déjà programmés.
+            Notifications.applyReminderSound(getApplication(), updated.reminderSound)
             refresh()
         }
     }

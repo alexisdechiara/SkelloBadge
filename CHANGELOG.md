@@ -17,6 +17,16 @@ quotidien, en une phrase par point. Le détail technique reste dans l'historique
   ancienne que la dernière : il faut alors ouvrir une nouvelle section en tête.
 -->
 
+## 1.3.0
+
+- **Un son à part pour les rappels** — un carillon de deux notes remplace le son de
+  notification du téléphone, qu'on confondait avec celui des messages.
+- **Le son se choisit** dans Réglages → Sons, parmi cinq sons intégrés (Carillon,
+  Clochette, Marimba, Bips, Réveil), le son du téléphone, ou n'importe quel autre son
+  présent sur le téléphone. Chaque son se fait entendre au toucher avant d'être retenu.
+- **L'alarme plein écran a aussi son réglage de son.** Elle garde par défaut la sonnerie
+  du réveil, et repasse sur celle-ci si le son choisi a disparu du téléphone.
+
 ## 1.2.0
 
 - **La pause lue dans la note** — « Pause cantine 12h-13h », « Repas 11h45 → 12h30 »
